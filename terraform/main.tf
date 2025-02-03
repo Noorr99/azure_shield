@@ -126,7 +126,7 @@ module "storage_table_private_dns_zone" {
   name                = "privatelink.table.core.windows.net"
   resource_group_name = var.resource_group_name
   virtual_networks_to_link = {
-    module.vnet.vnet_name = {
+    (module.vnet.vnet_name) = {
       subscription_id     = data.azurerm_client_config.current.subscription_id
       resource_group_name = var.resource_group_name
     }
@@ -185,7 +185,7 @@ module "openai_private_dns_zone" {
   name                = "privatelink.openai.azure.com"
   resource_group_name = var.resource_group_name
   virtual_networks_to_link = {
-    module.vnet.vnet_name = {
+    (module.vnet.vnet_name) = {
       subscription_id     = data.azurerm_client_config.current.subscription_id
       resource_group_name = var.resource_group_name
     }
