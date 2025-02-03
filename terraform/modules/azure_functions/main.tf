@@ -11,8 +11,11 @@ resource "azurerm_function_app" "functions_app" {
     type = "SystemAssigned"
   }
   
-  site_config {
-    # VNet integration is removed here. If needed, configure VNet integration using a separate resource.
+  dynamic "site_config" {
+    for_each = var.subnet_id != "" ? [var.subnet_id] : []
+    content {
+      virtual_network_subnet_id = site_config.value
+    }
   }
   
   app_settings = {
