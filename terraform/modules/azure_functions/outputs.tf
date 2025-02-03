@@ -3,7 +3,12 @@ output "function_app_id" {
   value       = azurerm_function_app.functions_app.id
 }
 
-output "managed_identity_principal_id" {
-  description = "The managed identity principal ID of the Function App."
-  value       = azurerm_function_app.functions_app.identity[0].principal_id
+output "service_plan_id" {
+  description = "The ID of the Function App Service Plan."
+  value       = azurerm_service_plan.functions_plan.id
+}
+
+output "storage_account_name" {
+  description = "The name of the storage account created for the Function App."
+  value       = azurerm_storage_account.functions_storage.name
 }
