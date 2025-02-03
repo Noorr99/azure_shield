@@ -58,23 +58,23 @@ module "vnet" {
 # NSG Modules and Associations
 #############################
 module "services_nsg" {
-  source                     = "./modules/network_security_group"
-  name                       = var.services_nsg_name
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = var.location
-  security_rules             = var.services_nsg_rules
-  tags                       = var.tags
-  # NOTE: Diagnostic settings resource in this module has been removed or commented out.
+  source              = "./modules/network_security_group"
+  name                = var.services_nsg_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  security_rules      = var.services_nsg_rules
+  tags                = var.tags
+  # Removed log_analytics_workspace_id from here.
 }
 
 module "pe_nsg" {
-  source                     = "./modules/network_security_group"
-  name                       = var.pe_nsg_name
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = var.location
-  security_rules             = var.pe_nsg_rules
-  tags                       = var.tags
-  # NOTE: Diagnostic settings resource in this module has been removed or commented out.
+  source              = "./modules/network_security_group"
+  name                = var.pe_nsg_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  security_rules      = var.pe_nsg_rules
+  tags                = var.tags
+  # Removed log_analytics_workspace_id from here.
 }
 
 resource "azurerm_subnet_network_security_group_association" "services_assoc" {
@@ -167,18 +167,30 @@ module "storage_table_private_endpoint" {
 module "openai" {
   source                     = "./modules/openai"
   resource_group_name        = azurerm_resource_group.rg.name
-  location                   = "eastus"  # Use a supported region for OpenAI
+  location                   = "eastus"  # OpenAI is supported in eastus.
   name                       = var.openai_name
   sku_name                   = var.openai_sku
   tags                       = var.tags
   custom_subdomain_name      = var.openai_custom_subdomain_name
   public_network_access_enabled = false
   deployments                   = var.openai_deployments
-  log_analytics_workspace_id    = var.log_analytics_workspace_id
-  # NOTE: Diagnostic settings resource in this module has been removed or commented out.
+  # Removed log_analytics_workspace_id from here.
 }
 
-# The module for OpenAI private endpoint is commented out due to GroupId issues.
+module "openai_private_dns_zone" {
+  source                   = "./modules/private_dns_zone"
+  name                     = "privatelink.openai.azure.com"
+  resource_group_name      = azurerm_resource_group.rg.name
+  virtual_networks_to_link = {
+    (var.vnet_name) = {
+      subscription_id     = data.azurerm_client_config.current.subscription_id
+      resource_group_name = azurerm_resource_group.rg.name
+    }
+  }
+  tags = var.tags
+}
+
+# Commented out due to GroupId issues:
 # module "openai_private_endpoint" {
 #   source                         = "./modules/private_endpoint"
 #   name                           = "pe-${module.openai.name}"
@@ -192,3 +204,5 @@ module "openai" {
 #   private_dns_zone_group_name    = "OpenAiPrivateDnsZoneGroup"
 #   private_dns_zone_group_ids     = [ module.openai_private_dns_zone.id ]
 # }
+
+# (Manually Deployed) Services: Logic Apps, Azure Functions, and Azure Cognitive Search will use the services subnet.

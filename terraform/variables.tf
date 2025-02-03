@@ -1,3 +1,6 @@
+///////////////////////////////
+// General Resource Group & Location
+///////////////////////////////
 variable "resource_group_name" {
   description = "Name of the dedicated resource group."
   type        = string
@@ -7,7 +10,7 @@ variable "resource_group_name" {
 variable "location" {
   description = "Azure region for all resources. (e.g., eastus, northeurope)"
   type        = string
-  default     = "eastus"   # For OpenAI, eastus is a supported region.
+  default     = "eastus"   # Use eastus since OpenAI is supported there.
 }
 
 variable "tags" {
@@ -19,6 +22,9 @@ variable "tags" {
   }
 }
 
+///////////////////////////////
+// Virtual Network & Subnets
+///////////////////////////////
 variable "vnet_name" {
   description = "Name of the virtual network."
   type        = string
@@ -55,12 +61,9 @@ variable "pe_subnet_prefix" {
   default     = ["10.0.2.0/24"]
 }
 
-variable "log_analytics_workspace_id" {
-  description = "Resource ID of the Log Analytics workspace."
-  type        = string
-  default     = "/subscriptions/<your-subscription-id>/resourceGroups/<rg-name>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>"
-}
-
+///////////////////////////////
+// NSG Variables for Subnets
+///////////////////////////////
 variable "services_nsg_name" {
   description = "Name of the NSG for the services subnet."
   type        = string
@@ -85,6 +88,9 @@ variable "pe_nsg_rules" {
   default     = []
 }
 
+///////////////////////////////
+// Azure Storage Account Variables
+///////////////////////////////
 variable "storage_account_name" {
   description = "Name of the storage account (must be all lowercase and globally unique)."
   type        = string
@@ -121,6 +127,9 @@ variable "storage_ip_rules" {
   default     = []
 }
 
+///////////////////////////////
+// Azure OpenAI Variables
+///////////////////////////////
 variable "openai_name" {
   description = "Name of the Azure OpenAI service."
   type        = string
