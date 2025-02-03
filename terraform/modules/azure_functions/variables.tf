@@ -18,11 +18,6 @@ variable "location" {
   type        = string
 }
 
-variable "subnet_id" {
-  description = "The subnet ID for VNet integration."
-  type        = string
-}
-
 variable "tags" {
   description = "Tags to apply to the resources."
   type        = map(string)
