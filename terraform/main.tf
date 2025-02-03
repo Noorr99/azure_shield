@@ -59,17 +59,17 @@ module "vnet" {
 }
 
 ###############################
-# Network Security Groups (NSGs) – Using Your Existing Module
+# Network Security Groups (NSGs)
 ###############################
 
 module "nsg_services" {
-  source                        = "./modules/network_security_group"
-  name                          = var.nsg_services_name
-  resource_group_name           = azurerm_resource_group.main.name
-  location                      = var.location
-  security_rules                = var.nsg_services_rules
-  log_analytics_workspace_id    = var.log_analytics_workspace_id
-  tags                          = var.tags
+  source                     = "./modules/network_security_group"
+  name                       = var.nsg_services_name
+  resource_group_name        = azurerm_resource_group.main.name
+  location                   = var.location
+  security_rules             = var.nsg_services_rules
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+  tags                       = var.tags
 }
 
 resource "azurerm_subnet_network_security_group_association" "services" {
@@ -78,13 +78,13 @@ resource "azurerm_subnet_network_security_group_association" "services" {
 }
 
 module "nsg_ai" {
-  source                        = "./modules/network_security_group"
-  name                          = var.nsg_ai_name
-  resource_group_name           = azurerm_resource_group.main.name
-  location                      = var.location
-  security_rules                = var.nsg_ai_rules
-  log_analytics_workspace_id    = var.log_analytics_workspace_id
-  tags                          = var.tags
+  source                     = "./modules/network_security_group"
+  name                       = var.nsg_ai_name
+  resource_group_name        = azurerm_resource_group.main.name
+  location                   = var.location
+  security_rules             = var.nsg_ai_rules
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+  tags                       = var.tags
 }
 
 resource "azurerm_subnet_network_security_group_association" "ai" {
@@ -93,7 +93,7 @@ resource "azurerm_subnet_network_security_group_association" "ai" {
 }
 
 ###############################
-# Private DNS Zones (Reusing Existing Module)
+# Private DNS Zones (Existing Modules)
 ###############################
 
 module "dns_blob" {
@@ -101,7 +101,7 @@ module "dns_blob" {
   name                = "privatelink.blob.core.windows.net"
   resource_group_name = azurerm_resource_group.main.name
   virtual_networks_to_link = {
-    (module.vnet.vnet_name) = {
+    var.vnet_name = {
       virtual_network_id = module.vnet.vnet_id
     }
   }
@@ -113,7 +113,7 @@ module "dns_table" {
   name                = "privatelink.table.core.windows.net"
   resource_group_name = azurerm_resource_group.main.name
   virtual_networks_to_link = {
-    (module.vnet.vnet_name) = {
+    var.vnet_name = {
       virtual_network_id = module.vnet.vnet_id
     }
   }
@@ -121,21 +121,21 @@ module "dns_table" {
 }
 
 ###############################
-# Services (Azure Functions, Logic Apps, Storage, AI)
+# Services
 ###############################
 
-# Azure Functions (Premium, VNet integrated)
+# Azure Functions (Premium, VNet integrated via separate resource if needed)
 module "functions" {
   source              = "./modules/azure_functions"
   functions_name      = var.functions_name
   sku                 = var.functions_sku
   resource_group_name = azurerm_resource_group.main.name
   location            = var.location
-  subnet_id           = module.vnet.subnet_ids[var.services_subnet_name]
+  # Removed unsupported virtual_network_subnet_id argument.
   tags                = var.tags
 }
 
-# Logic Apps Standard (VNet integrated)
+# Logic Apps Standard (VNet integrated with Managed Identity)
 module "logic_apps" {
   source                         = "./modules/logic_apps"
   logic_apps_name                = var.logic_apps_name
@@ -154,16 +154,15 @@ module "storage" {
   resource_group_name      = azurerm_resource_group.main.name
   location                 = var.location
   name                     = var.storage_account_name
-  account_kind             = var.storage_account_kind    // if you have this variable (default "StorageV2")
+  account_kind             = var.storage_account_kind
   account_tier             = var.storage_account_tier
   replication_type         = var.storage_account_replication_type
-  is_hns_enabled           = var.is_hns_enabled          // ensure this variable is defined
-  default_action           = var.default_action          // ensure this variable is defined
-  ip_rules                 = var.ip_rules                // ensure this variable is defined
-  virtual_network_subnet_ids = var.virtual_network_subnet_ids  // ensure this variable is defined
+  is_hns_enabled           = var.is_hns_enabled
+  default_action           = var.default_action
+  ip_rules                 = var.ip_rules
+  virtual_network_subnet_ids = var.virtual_network_subnet_ids
   tags                     = var.tags
 }
-
 
 # Azure Cognitive Search
 module "search" {

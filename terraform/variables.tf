@@ -1,14 +1,10 @@
-###############################
-# General
-###############################
-
 variable "resource_group_name" {
   description = "Name of the resource group for all resources."
   type        = string
 }
 
 variable "location" {
-  description = "Azure region (for example, northeurope)."
+  description = "Azure region (e.g. northeurope)."
   type        = string
 }
 
@@ -16,10 +12,6 @@ variable "tags" {
   description = "Tags to apply to all resources."
   type        = map(string)
 }
-
-###############################
-# Virtual Network & Subnets
-###############################
 
 variable "vnet_name" {
   description = "Name of the Virtual Network."
@@ -32,28 +24,24 @@ variable "vnet_address_space" {
 }
 
 variable "services_subnet_name" {
-  description = "Name of the subnet for services (Azure Functions, Logic Apps)."
+  description = "Name of the subnet for services (Functions, Logic Apps)."
   type        = string
 }
 
 variable "services_subnet_address_prefixes" {
-  description = "Address prefix(es) for the services subnet."
+  description = "Address prefixes for the services subnet."
   type        = list(string)
 }
 
 variable "ai_subnet_name" {
-  description = "Name of the subnet for AI and private endpoints."
+  description = "Name of the subnet for AI/private endpoints."
   type        = string
 }
 
 variable "ai_subnet_address_prefixes" {
-  description = "Address prefix(es) for the AI subnet."
+  description = "Address prefixes for the AI subnet."
   type        = list(string)
 }
-
-###############################
-# NSG Variables
-###############################
 
 variable "nsg_services_name" {
   description = "Name of the NSG for the services subnet."
@@ -61,18 +49,9 @@ variable "nsg_services_name" {
 }
 
 variable "nsg_services_rules" {
-  description = "Security rules for the services NSG."
-  type = list(object({
-    name                       = string
-    priority                   = number
-    direction                  = string
-    access                     = string
-    protocol                   = string
-    source_address_prefix      = string
-    destination_address_prefix = string
-    source_port_range          = string
-    destination_port_range     = string
-  }))
+  description = "Security rules for the NSG of the services subnet."
+  type        = any
+  default     = []
 }
 
 variable "nsg_ai_name" {
@@ -81,23 +60,15 @@ variable "nsg_ai_name" {
 }
 
 variable "nsg_ai_rules" {
-  description = "Security rules for the AI NSG."
-  type = list(object({
-    name                       = string
-    priority                   = number
-    direction                  = string
-    access                     = string
-    protocol                   = string
-    source_address_prefix      = string
-    destination_address_prefix = string
-    source_port_range          = string
-    destination_port_range     = string
-  }))
+  description = "Security rules for the NSG of the AI subnet."
+  type        = any
+  default     = []
 }
 
-###############################
-# Azure Functions
-###############################
+variable "log_analytics_workspace_id" {
+  description = "Resource ID of the Log Analytics Workspace for NSG diagnostics."
+  type        = string
+}
 
 variable "functions_name" {
   description = "Name of the Azure Functions app."
@@ -105,13 +76,9 @@ variable "functions_name" {
 }
 
 variable "functions_sku" {
-  description = "SKU for the Azure Functions app (for example, P1v2)."
+  description = "SKU for the Azure Functions app (e.g., P1v2)."
   type        = string
 }
-
-###############################
-# Logic Apps
-###############################
 
 variable "logic_apps_name" {
   description = "Name of the Logic Apps instance."
@@ -119,43 +86,59 @@ variable "logic_apps_name" {
 }
 
 variable "logic_apps_sku" {
-  description = "SKU for Logic Apps (should be Standard)."
+  description = "SKU for Logic Apps (Standard)."
   type        = string
 }
 
 variable "logic_apps_storage_account_name" {
-  description = "Name of the storage account for Logic Apps."
+  description = "Name of the storage account used by Logic Apps."
   type        = string
 }
-
-variable "logic_apps_storage_account_access_key" {
-  description = "Access key for the Logic Apps storage account."
-  type        = string
-  sensitive   = true
-}
-
-###############################
-# Storage Account
-###############################
 
 variable "storage_account_name" {
-  description = "Name of the Storage Account."
+  description = "Name of the storage account."
   type        = string
+}
+
+variable "storage_account_kind" {
+  description = "Kind of the storage account (e.g., StorageV2)."
+  type        = string
+  default     = "StorageV2"
 }
 
 variable "storage_account_tier" {
-  description = "Tier for the Storage Account."
+  description = "Tier of the storage account (e.g., Standard or Premium)."
   type        = string
 }
 
 variable "storage_account_replication_type" {
-  description = "Replication type for the Storage Account."
+  description = "Replication type for the storage account (e.g., LRS, GRS, etc.)."
   type        = string
 }
 
-###############################
-# Azure Cognitive Search
-###############################
+variable "is_hns_enabled" {
+  description = "Whether hierarchical namespace is enabled."
+  type        = bool
+  default     = false
+}
+
+variable "default_action" {
+  description = "Default network action for storage (Allow or Deny)."
+  type        = string
+  default     = "Allow"
+}
+
+variable "ip_rules" {
+  description = "List of IP rules for the storage account."
+  type        = list(string)
+  default     = []
+}
+
+variable "virtual_network_subnet_ids" {
+  description = "List of subnet resource IDs for virtual network rules on the storage account."
+  type        = list(string)
+  default     = []
+}
 
 variable "search_service_name" {
   description = "Name of the Azure Cognitive Search service."
@@ -163,84 +146,11 @@ variable "search_service_name" {
 }
 
 variable "search_sku" {
-  description = "SKU for the Search service (for example, standard)."
+  description = "SKU for the Search service (e.g., standard)."
   type        = string
 }
-
-###############################
-# Azure OpenAI
-###############################
 
 variable "openai_name" {
   description = "Name of the Azure OpenAI service."
   type        = string
 }
-
-/*
-
-###############################
-# Key Vault (Optional)
-###############################
-
-variable "key_vault_name" {
-  description = "Name of the Key Vault."
-  type        = string
-}
-
-variable "tenant_id" {
-  description = "Tenant ID for Key Vault."
-  type        = string
-  sensitive   = true
-}
-
-variable "key_vault_sku" {
-  description = "SKU for Key Vault (for example, standard)."
-  type        = string
-}
-
-variable "key_vault_enabled_for_deployment" {
-  description = "Allow deployment access to the Key Vault."
-  type        = bool
-}
-
-variable "key_vault_enabled_for_disk_encryption" {
-  description = "Allow disk encryption access to the Key Vault."
-  type        = bool
-}
-
-variable "key_vault_enabled_for_template_deployment" {
-  description = "Allow template deployment access to the Key Vault."
-  type        = bool
-}
-
-variable "key_vault_enable_rbac_authorization" {
-  description = "Enable RBAC for Key Vault."
-  type        = bool
-}
-
-variable "key_vault_purge_protection_enabled" {
-  description = "Enable purge protection on the Key Vault."
-  type        = bool
-}
-
-variable "key_vault_soft_delete_retention_days" {
-  description = "Soft delete retention days for Key Vault."
-  type        = number
-}
-
-variable "key_vault_bypass" {
-  description = "Bypass option for Key Vault."
-  type        = string
-}
-
-variable "key_vault_default_action" {
-  description = "Default network action for Key Vault (Allow or Deny)."
-  type        = string
-}
-
-variable "key_vault_ip_rules" {
-  description = "IP rules for Key Vault."
-  type        = list(string)
-}
-
-*/
