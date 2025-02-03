@@ -77,11 +77,12 @@ log_analytics_workspace_id = "/subscriptions/your_subscription_id/resourceGroups
 
 # Azure Functions
 # Note: Ensure functions_name contains only lowercase letters and numbers (no hyphens).
-functions_name           = "funcnesa"
+
+functions_name           = "funcnesa"  # Ensure this is 3-24 characters, lowercase and without hyphens.
 functions_sku            = "P1v2"
-app_service_plan_tier    = "Dynamic"    # or "PremiumV2" as needed
-app_service_plan_size    = "P1v2"       # if tier is PremiumV2; if Dynamic, then "Y1" is used by the module
-function_app_version     = "~4"         # or "~3", depending on your requirement
+app_service_plan_tier    = "Dynamic"    # or "PremiumV2" as needed.
+app_service_plan_size    = "P1v2"       # If tier is PremiumV2; if Dynamic, then the module will use "Y1".
+function_app_version     = "~4"         # or "~3" as required.
 functions_worker_runtime = "dotnet"     # or "python", "node", etc.
 
 # Logic Apps

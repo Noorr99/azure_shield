@@ -75,6 +75,7 @@ variable "log_analytics_workspace_id" {
 }
 
 // Azure Functions Variables
+
 variable "functions_name" {
   description = "Name of the Azure Functions app. Must be 3-24 characters, lowercase letters and numbers only."
   type        = string
@@ -105,26 +106,6 @@ variable "functions_worker_runtime" {
   type        = string
 }
 
-// Logic Apps Variables
-variable "logic_apps_name" {
-  description = "Name of the Logic Apps instance."
-  type        = string
-}
-
-variable "logic_apps_sku" {
-  description = "SKU for Logic Apps (Standard)."
-  type        = string
-}
-
-variable "logic_apps_storage_account_name" {
-  description = "Name of the storage account used by Logic Apps."
-  type        = string
-}
-
-variable "logic_apps_storage_account_access_key" {
-  description = "Access key for the storage account used by Logic Apps."
-  type        = string
-}
 
 // Storage Account Variables
 variable "storage_account_name" {

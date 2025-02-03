@@ -9,7 +9,7 @@ terraform {
 
 # Create a storage account for the Function App.
 resource "azurerm_storage_account" "functions_storage" {
-  # Remove hyphens from the functions name so that the resulting storage account name is valid.
+  # Ensure the storage account name is valid (lowercase letters and numbers only, 3-24 characters)
   name                     = lower(replace(var.functions_name, "-", ""))
   resource_group_name      = var.resource_group_name
   location                 = var.location
@@ -18,17 +18,17 @@ resource "azurerm_storage_account" "functions_storage" {
   tags                     = var.tags
 }
 
-# Create a service plan using the new resource.
+# Create a Service Plan using the new resource.
 resource "azurerm_service_plan" "functions_plan" {
   name                = "${var.functions_name}-plan"
   location            = var.location
   resource_group_name = var.resource_group_name
-  os_type             = "Linux"        // Required attribute for Linux Function Apps.
-  reserved            = true           // Must be true for Linux.
+  os_type             = "Linux"    // Required for Linux Function Apps.
+  // Remove the "reserved" attribute—its value is now auto‐configured.
 
-  # Combine tier and size:
-  # If the tier is "Dynamic", then sku_name will be "Y1" (the consumption plan);
-  # otherwise (for Premium), use the value from var.app_service_plan_size.
+  # Compute sku_name based on the tier:
+  # If the tier is "Dynamic", then sku_name is "Y1" (consumption plan);
+  # otherwise (e.g. PremiumV2), use the provided app_service_plan_size.
   sku_name = var.app_service_plan_tier == "Dynamic" ? "Y1" : var.app_service_plan_size
 
   tags = var.tags

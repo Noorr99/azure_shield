@@ -29,7 +29,7 @@ variable "function_app_version" {
 }
 
 variable "functions_worker_runtime" {
-  description = "Functions worker runtime (e.g., dotnet, python, node)."
+  description = "Worker runtime for the Functions app (e.g., dotnet, python, node)."
   type        = string
 }
 
