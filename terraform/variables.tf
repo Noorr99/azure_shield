@@ -1,47 +1,25 @@
 ///////////////////////////////
-// Backend Configuration
-///////////////////////////////
-variable "backend_resource_group" {
-  description = "Resource group name for storing Terraform state."
-  type        = string
-}
-
-variable "backend_storage_account" {
-  description = "Storage account name for the Terraform state backend."
-  type        = string
-}
-
-variable "backend_container" {
-  description = "Container name for the Terraform state backend."
-  type        = string
-}
-
-variable "backend_key" {
-  description = "The key for the Terraform state file."
-  type        = string
-}
-
-variable "backend_subscription_id" {
-  description = "Subscription ID for the Terraform state backend."
-  type        = string
-}
-
-///////////////////////////////
 // General Resource Group & Location
 ///////////////////////////////
 variable "resource_group_name" {
   description = "Name of the dedicated resource group."
   type        = string
+  default     = "rg-sheildnoor"
 }
 
 variable "location" {
   description = "Azure region for all resources. (e.g., northeurope)"
   type        = string
+  default     = "northeurope"
 }
 
 variable "tags" {
   description = "Tags to apply to all resources."
   type        = map(string)
+  default = {
+    environment = "sheildnoor"
+    project     = "sheildnoor"
+  }
 }
 
 ///////////////////////////////
@@ -50,31 +28,37 @@ variable "tags" {
 variable "vnet_name" {
   description = "Name of the virtual network."
   type        = string
+  default     = "vnet-sheildnoor"
 }
 
 variable "vnet_address_space" {
   description = "Address space for the virtual network."
   type        = list(string)
+  default     = ["10.0.0.0/16"]
 }
 
 variable "services_subnet_name" {
   description = "Name of the subnet for services (Logic Apps, Azure Functions, etc.)."
   type        = string
+  default     = "snet-sheildnoor-services"
 }
 
 variable "services_subnet_prefix" {
   description = "Address prefix(es) for the services subnet."
   type        = list(string)
+  default     = ["10.0.1.0/24"]
 }
 
 variable "pe_subnet_name" {
   description = "Name of the subnet for private endpoints."
   type        = string
+  default     = "snet-sheildnoor-pe"
 }
 
 variable "pe_subnet_prefix" {
   description = "Address prefix(es) for the private endpoints subnet."
   type        = list(string)
+  default     = ["10.0.2.0/24"]
 }
 
 ///////////////////////////////
@@ -83,6 +67,8 @@ variable "pe_subnet_prefix" {
 variable "log_analytics_workspace_id" {
   description = "Resource ID of the Log Analytics workspace."
   type        = string
+  # Note: Replace the below default with your actual workspace resource id if available.
+  default     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sheildnoor/providers/Microsoft.OperationalInsights/workspaces/sheildnoor-law"
 }
 
 ///////////////////////////////
@@ -91,6 +77,7 @@ variable "log_analytics_workspace_id" {
 variable "services_nsg_name" {
   description = "Name of the NSG for the services subnet."
   type        = string
+  default     = "nsg-sheildnoor-services"
 }
 
 variable "services_nsg_rules" {
@@ -102,6 +89,7 @@ variable "services_nsg_rules" {
 variable "pe_nsg_name" {
   description = "Name of the NSG for the private endpoints subnet."
   type        = string
+  default     = "nsg-sheildnoor-pe"
 }
 
 variable "pe_nsg_rules" {
@@ -116,6 +104,8 @@ variable "pe_nsg_rules" {
 variable "storage_account_name" {
   description = "Name of the storage account."
   type        = string
+  # Storage account names must be globally unique and lower-case.
+  default     = "stsheildnoor"
 }
 
 variable "storage_account_kind" {
@@ -154,6 +144,7 @@ variable "storage_ip_rules" {
 variable "openai_name" {
   description = "Name of the Azure OpenAI service."
   type        = string
+  default     = "openai-sheildnoor"
 }
 
 variable "openai_sku" {
@@ -165,6 +156,7 @@ variable "openai_sku" {
 variable "openai_custom_subdomain_name" {
   description = "Custom subdomain name for the Azure OpenAI service."
   type        = string
+  default     = "sheildnoor-openai"
 }
 
 variable "openai_deployments" {
