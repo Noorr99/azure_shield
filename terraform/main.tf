@@ -124,6 +124,7 @@ module "dns_table" {
 # Services
 ###############################
 
+/*
 # Azure Functions (Linux Function App in a consumption or dynamic plan)
 module "functions" {
   source                 = "./modules/azure_functions"
@@ -136,7 +137,7 @@ module "functions" {
   functions_worker_runtime = var.functions_worker_runtime
   tags                   = var.tags
 }
-
+*/
 
 
 # Logic Apps Standard (VNet integrated with Managed Identity)

@@ -1,40 +1,38 @@
-variable "functions_name" {
-  description = "Name of the Azure Function App. Must be 3-24 characters, lowercase letters and numbers only."
-  type        = string
-}
-
+// Resource Group & Location
 variable "resource_group_name" {
-  description = "Name of the resource group."
+  description = "The name of the resource group in which to create the Function App."
   type        = string
 }
 
 variable "location" {
-  description = "Azure location (e.g., northeurope)."
+  description = "The Azure region for the resources (e.g., 'northeurope')."
   type        = string
 }
 
-variable "app_service_plan_tier" {
-  description = "Tier for the Service Plan (e.g., Dynamic for Consumption or PremiumV2 for Premium)."
-  type        = string
-}
-
-variable "app_service_plan_size" {
-  description = "Size for the Service Plan (e.g., Y1 for consumption; P1v2 for premium)."
-  type        = string
-}
-
-variable "function_app_version" {
-  description = "Version for the Function App (e.g., ~3 or ~4)."
+// Function App Settings
+variable "functions_name" {
+  description = "Name of the Azure Functions app. Must be 3-24 characters, lowercase letters and numbers only."
   type        = string
 }
 
 variable "functions_worker_runtime" {
-  description = "Worker runtime for the Functions app (e.g., dotnet, python, node)."
+  description = "The runtime for the Functions app (e.g., 'dotnet', 'node', 'python')."
   type        = string
 }
 
+// Service Plan Settings
+variable "app_service_plan_tier" {
+  description = "Tier for the App Service Plan. Use 'Dynamic' for a Consumption plan or another value (e.g., 'PremiumV2') for a dedicated plan."
+  type        = string
+}
+
+variable "app_service_plan_size" {
+  description = "The size for the App Service Plan. For a Consumption plan, this is usually 'Y1'; for Premium, e.g., 'P1v2'."
+  type        = string
+}
+
+// Tags to apply to all resources.
 variable "tags" {
-  description = "Tags to apply to the resources."
+  description = "A map of tags to apply to resources."
   type        = map(string)
-  default     = {}
 }
