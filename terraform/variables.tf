@@ -1,188 +1,142 @@
-// Resource & General Settings
-variable "resource_group_name" {
-  description = "Name of the resource group for all resources."
-  type        = string
-}
+//////////////////////////////
+// Region & Resource Groups //
+//////////////////////////////
 
 variable "location" {
-  description = "Azure region (e.g., northeurope)."
+  description = "Specifies the Azure region where resources will be created."
+  type        = string
+  default     = "northeurope"
+}
+
+variable "network_rg_name" {
+  description = "Name of the resource group to hold networking resources (VNet, subnets, etc.)."
   type        = string
 }
 
-variable "tags" {
-  description = "Tags to apply to all resources."
-  type        = map(string)
+variable "services_rg_name" {
+  description = "Name of the resource group to hold service resources (Azure Functions, Logic Apps, OpenAI, etc.)."
+  type        = string
 }
 
-// Virtual Network Settings
+//////////////////////////////
+// Networking & Subnets    //
+//////////////////////////////
+
 variable "vnet_name" {
-  description = "Name of the Virtual Network."
+  description = "Specifies the name of the Azure virtual network."
   type        = string
 }
 
 variable "vnet_address_space" {
-  description = "Address space for the Virtual Network."
+  description = "Specifies the address space for the Azure virtual network."
   type        = list(string)
 }
 
-// Subnet Settings
-variable "services_subnet_name" {
-  description = "Name of the subnet for services (Functions, Logic Apps)."
+variable "subnet_services_name" {
+  description = "Specifies the name of the subnet for services (Functions/Logic Apps)."
   type        = string
 }
 
-variable "services_subnet_address_prefixes" {
-  description = "Address prefixes for the services subnet."
+variable "subnet_services_prefix" {
+  description = "Address prefix for the services subnet."
   type        = list(string)
 }
 
-variable "ai_subnet_name" {
-  description = "Name of the subnet for AI/private endpoints."
+variable "subnet_ai_name" {
+  description = "Specifies the name of the subnet for private endpoints (OpenAI, Cognitive Search, Storage, etc.)."
   type        = string
 }
 
-variable "ai_subnet_address_prefixes" {
-  description = "Address prefixes for the AI subnet."
+variable "subnet_ai_prefix" {
+  description = "Address prefix for the private endpoints subnet."
   type        = list(string)
 }
 
-// NSG Settings
+//////////////////////////////
+// NSG Variables (Optional) //
+//////////////////////////////
+
 variable "nsg_services_name" {
   description = "Name of the NSG for the services subnet."
   type        = string
-}
-
-variable "nsg_services_rules" {
-  description = "Security rules for the NSG of the services subnet."
-  type        = any
-  default     = []
+  default     = "nsg-services"
 }
 
 variable "nsg_ai_name" {
-  description = "Name of the NSG for the AI subnet."
+  description = "Name of the NSG for the AI/private endpoints subnet."
+  type        = string
+  default     = "nsg-ai"
+}
+
+//////////////////////////////
+// Azure OpenAI Variables   //
+//////////////////////////////
+variable "openai_name" {
+  description = "Name of the Azure OpenAI resource."
   type        = string
 }
 
-variable "nsg_ai_rules" {
-  description = "Security rules for the NSG of the AI subnet."
-  type        = any
-  default     = []
-}
-
-variable "log_analytics_workspace_id" {
-  description = "Resource ID of the Log Analytics Workspace for NSG diagnostics."
+variable "openai_sku" {
+  description = "SKU for Azure OpenAI resource."
   type        = string
+  default     = "S0"
 }
 
-// Azure Functions Variables
-/*
-variable "functions_name" {
-  description = "Name of the Azure Functions app. Must be 3-24 characters, lowercase letters and numbers only."
-  type        = string
-}
-
-variable "functions_sku" {
-  description = "SKU for the Azure Functions app (e.g., P1v2 or Y1)."
-  type        = string
-}
-
-variable "app_service_plan_tier" {
-  description = "Tier for the Service Plan (e.g., Dynamic or PremiumV2)."
-  type        = string
-}
-
-variable "app_service_plan_size" {
-  description = "Size for the Service Plan (e.g., Y1 for consumption, P1v2 for premium)."
-  type        = string
-}
-
-variable "function_app_version" {
-  description = "Version for the Function App (e.g., ~3 or ~4)."
-  type        = string
-}
-
-variable "functions_worker_runtime" {
-  description = "Worker runtime for the Functions app (e.g., dotnet, python, node)."
-  type        = string
-}
-
-*/
-
-// Storage Account Variables
-variable "storage_account_name" {
-  description = "Name of the storage account."
-  type        = string
-}
-
-variable "storage_account_kind" {
-  description = "Kind of the storage account (e.g., StorageV2)."
-  type        = string
-  default     = "StorageV2"
-}
-
-variable "storage_account_tier" {
-  description = "Tier of the storage account (e.g., Standard or Premium)."
-  type        = string
-}
-
-variable "storage_account_replication_type" {
-  description = "Replication type for the storage account (e.g., LRS, GRS, etc.)."
-  type        = string
-}
-
-variable "is_hns_enabled" {
-  description = "Whether hierarchical namespace is enabled."
-  type        = bool
-  default     = false
-}
-
-variable "default_action" {
-  description = "Default network action for storage (Allow or Deny)."
-  type        = string
-  default     = "Allow"
-}
-
-variable "ip_rules" {
-  description = "List of IP rules for the storage account."
-  type        = list(string)
-  default     = []
-}
-
-variable "virtual_network_subnet_ids" {
-  description = "List of subnet resource IDs for virtual network rules on the storage account."
-  type        = list(string)
-  default     = []
-}
-
-// Azure Cognitive Search Variables
-variable "search_service_name" {
-  description = "Name of the Azure Cognitive Search service."
+//////////////////////////////
+// Cognitive Search         //
+//////////////////////////////
+variable "search_name" {
+  description = "Name of Azure Cognitive Search service."
   type        = string
 }
 
 variable "search_sku" {
-  description = "SKU for the Azure Cognitive Search service (e.g., standard)."
+  description = "SKU for Azure Cognitive Search (e.g., 'standard', 'basic', etc.)."
+  type        = string
+  default     = "standard"
+}
+
+//////////////////////////////
+// Storage Account          //
+//////////////////////////////
+variable "storage_account_name" {
+  description = "Name of the Storage Account for blob & table."
   type        = string
 }
 
-// Azure OpenAI Variables
-variable "openai_name" {
-  description = "Name of the Azure OpenAI service."
+//////////////////////////////
+// Logic Apps (Standard)    //
+//////////////////////////////
+variable "logic_app_name" {
+  description = "Name of the Logic App (Standard)."
   type        = string
 }
 
-
-variable "logic_apps_name" {
-  description = "Name of the Logic Apps Standard app."
+//////////////////////////////
+// Azure Functions (Premium)//
+//////////////////////////////
+variable "function_app_name" {
+  description = "Name of the Azure Function App."
   type        = string
 }
 
-variable "logic_apps_sku" {
-  description = "SKU for the Logic Apps Standard app (e.g., Standard)."
+variable "function_app_plan_name" {
+  description = "Name of the App Service Plan for the function app."
   type        = string
+  default     = "asp-function-premium"
 }
 
-variable "logic_apps_storage_account_name" {
-  description = "Name of the storage account used by the Logic Apps Standard app."
+variable "function_app_sku" {
+  description = "SKU for the function app service plan. E.g., 'EP1', 'EP2' for Premium."
   type        = string
+  default     = "EP1"
+}
+
+//////////////////////////////
+// Tags                     //
+//////////////////////////////
+variable "tags" {
+  description = "Specifies tags to apply to all resources."
+  type        = map(string)
+  default     = {}
 }
