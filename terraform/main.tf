@@ -58,23 +58,23 @@ module "vnet" {
 # NSG Modules and Associations
 #############################
 module "services_nsg" {
-  source              = "./modules/network_security_group"
-  name                = var.services_nsg_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  security_rules      = var.services_nsg_rules
-  tags                = var.tags
-  # Removed log_analytics_workspace_id from here.
+  source                     = "./modules/network_security_group"
+  name                       = var.services_nsg_name
+  resource_group_name        = azurerm_resource_group.rg.name
+  location                   = var.location
+  security_rules             = var.services_nsg_rules
+  tags                       = var.tags
+  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value passed from variable.
 }
 
 module "pe_nsg" {
-  source              = "./modules/network_security_group"
-  name                = var.pe_nsg_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  security_rules      = var.pe_nsg_rules
-  tags                = var.tags
-  # Removed log_analytics_workspace_id from here.
+  source                     = "./modules/network_security_group"
+  name                       = var.pe_nsg_name
+  resource_group_name        = azurerm_resource_group.rg.name
+  location                   = var.location
+  security_rules             = var.pe_nsg_rules
+  tags                       = var.tags
+  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value.
 }
 
 resource "azurerm_subnet_network_security_group_association" "services_assoc" {
@@ -174,7 +174,7 @@ module "openai" {
   custom_subdomain_name      = var.openai_custom_subdomain_name
   public_network_access_enabled = false
   deployments                   = var.openai_deployments
-  # Removed log_analytics_workspace_id from here.
+  log_analytics_workspace_id    = var.log_analytics_workspace_id  # Dummy value.
 }
 
 module "openai_private_dns_zone" {
@@ -190,19 +190,4 @@ module "openai_private_dns_zone" {
   tags = var.tags
 }
 
-# Commented out due to GroupId issues:
-# module "openai_private_endpoint" {
-#   source                         = "./modules/private_endpoint"
-#   name                           = "pe-${module.openai.name}"
-#   location                       = var.location
-#   resource_group_name            = azurerm_resource_group.rg.name
-#   subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
-#   tags                           = var.tags
-#   private_connection_resource_id = module.openai.id
-#   is_manual_connection           = false
-#   subresource_name               = "openai"
-#   private_dns_zone_group_name    = "OpenAiPrivateDnsZoneGroup"
-#   private_dns_zone_group_ids     = [ module.openai_private_dns_zone.id ]
-# }
-
-# (Manually Deployed) Services: Logic Apps, Azure Functions, and Azure Cognitive Search will use the services subnet.
+# (Optional) The OpenAI private endpoint module is omitted due to GroupId issues.
