@@ -86,12 +86,12 @@ variable "functions_sku" {
 }
 
 variable "app_service_plan_tier" {
-  description = "Tier for the App Service Plan (e.g., Dynamic or PremiumV2)."
+  description = "Tier for the Service Plan (e.g., Dynamic or PremiumV2)."
   type        = string
 }
 
 variable "app_service_plan_size" {
-  description = "Size for the App Service Plan (e.g., Y1 for consumption, P1v2 for premium)."
+  description = "Size for the Service Plan (e.g., Y1 for consumption, P1v2 for premium)."
   type        = string
 }
 

@@ -138,6 +138,7 @@ module "functions" {
 }
 
 
+
 # Logic Apps Standard (VNet integrated with Managed Identity)
 module "logic_apps" {
   source                         = "./modules/logic_apps"

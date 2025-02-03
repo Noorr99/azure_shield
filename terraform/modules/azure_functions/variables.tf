@@ -1,5 +1,5 @@
 variable "functions_name" {
-  description = "Name of the Azure Function App. Must be between 3 and 24 lowercase alphanumeric characters."
+  description = "Name of the Azure Function App. Must be 3-24 characters, lowercase letters and numbers only."
   type        = string
 }
 
@@ -19,7 +19,7 @@ variable "app_service_plan_tier" {
 }
 
 variable "app_service_plan_size" {
-  description = "Size for the Service Plan (e.g., Y1 for Consumption; P1v2 for Premium)."
+  description = "Size for the Service Plan (e.g., Y1 for consumption; P1v2 for premium)."
   type        = string
 }
 

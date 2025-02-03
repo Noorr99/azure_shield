@@ -23,13 +23,13 @@ resource "azurerm_service_plan" "functions_plan" {
   name                = "${var.functions_name}-plan"
   location            = var.location
   resource_group_name = var.resource_group_name
-  kind                = "Linux"
-  reserved            = true
+  os_type             = "Linux"        // Required attribute for Linux Function Apps.
+  reserved            = true           // Must be true for Linux.
 
-  sku {
-    tier = var.app_service_plan_tier   // e.g., "Dynamic" or "PremiumV2"
-    size = var.app_service_plan_size     // e.g., "Y1" for consumption or "P1v2" for premium
-  }
+  # Combine tier and size:
+  # If the tier is "Dynamic", then sku_name will be "Y1" (the consumption plan);
+  # otherwise (for Premium), use the value from var.app_service_plan_size.
+  sku_name = var.app_service_plan_tier == "Dynamic" ? "Y1" : var.app_service_plan_size
 
   tags = var.tags
 }
