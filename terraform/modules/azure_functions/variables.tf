@@ -1,5 +1,5 @@
 variable "functions_name" {
-  description = "Name of the Azure Function App. Must be lowercase and 3-24 characters, using only letters and numbers."
+  description = "Name of the Azure Function App. Must be between 3 and 24 lowercase alphanumeric characters."
   type        = string
 }
 
@@ -13,24 +13,23 @@ variable "location" {
   type        = string
 }
 
-variable "os_type" {
-  description = "OS type for the Function App (e.g., 'linux' or 'windows')."
+variable "app_service_plan_tier" {
+  description = "Tier for the Service Plan (e.g., Dynamic for Consumption or PremiumV2 for Premium)."
   type        = string
-  default     = "linux"
 }
 
 variable "app_service_plan_size" {
-  description = "SKU for the Service Plan (e.g., 'Y1' for consumption or 'P1v2' for premium)."
+  description = "Size for the Service Plan (e.g., Y1 for Consumption; P1v2 for Premium)."
   type        = string
 }
 
 variable "function_app_version" {
-  description = "Version for the Function App (e.g., '~3' or '~4')."
+  description = "Version for the Function App (e.g., ~3 or ~4)."
   type        = string
 }
 
 variable "functions_worker_runtime" {
-  description = "Worker runtime for the Function App (e.g., dotnet, python, node)."
+  description = "Functions worker runtime (e.g., dotnet, python, node)."
   type        = string
 }
 

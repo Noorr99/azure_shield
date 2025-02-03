@@ -76,12 +76,13 @@ nsg_ai_rules = [
 log_analytics_workspace_id = "/subscriptions/your_subscription_id/resourceGroups/your_rg/providers/Microsoft.OperationalInsights/workspaces/your_workspace"
 
 # Azure Functions
-functions_name           = "funcnesa"          # Must be lowercase, no hyphens, 3-24 characters.
-functions_sku            = "P1v2"              # Not used in the new module but provided for legacy compatibility.
-os_type                  = "linux"
-app_service_plan_size    = "Y1"                # e.g., "Y1" for consumption; "P1v2" for premium.
-function_app_version     = "~4"                # e.g., "~4" or "~3".
-functions_worker_runtime = "dotnet"            # e.g., "dotnet", "python", "node".
+# Note: Ensure functions_name contains only lowercase letters and numbers.
+functions_name           = "funcnesa"
+functions_sku            = "P1v2"
+app_service_plan_tier    = "Dynamic"    # or "PremiumV2" as needed
+app_service_plan_size    = "Y1"         # e.g., Y1 for consumption; P1v2 for premium
+function_app_version     = "~4"         # or "~3", depending on your requirement
+functions_worker_runtime = "dotnet"     # or "python", "node", etc.
 
 # Logic Apps
 logic_apps_name                           = "logicappsne"

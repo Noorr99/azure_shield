@@ -2,13 +2,14 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 3.50"
+      version = "3.50"
     }
   }
 }
 
+# Create a storage account for the Function App.
 resource "azurerm_storage_account" "functions_storage" {
-  # Remove hyphens and lowercase the functions name
+  # Remove hyphens from the functions name so that the resulting storage account name is valid.
   name                     = lower(replace(var.functions_name, "-", ""))
   resource_group_name      = var.resource_group_name
   location                 = var.location
@@ -17,24 +18,31 @@ resource "azurerm_storage_account" "functions_storage" {
   tags                     = var.tags
 }
 
+# Create a service plan using the new resource.
 resource "azurerm_service_plan" "functions_plan" {
   name                = "${var.functions_name}-plan"
   location            = var.location
   resource_group_name = var.resource_group_name
-  os_type             = var.os_type
-  reserved            = var.os_type == "linux" ? true : false
-  sku_name            = var.app_service_plan_size
-  tags                = var.tags
+  kind                = "Linux"
+  reserved            = true
+
+  sku {
+    tier = var.app_service_plan_tier   // e.g., "Dynamic" or "PremiumV2"
+    size = var.app_service_plan_size     // e.g., "Y1" for consumption or "P1v2" for premium
+  }
+
+  tags = var.tags
 }
 
-resource "azurerm_function_app" "functions_app" {
+# Create a Linux Function App.
+resource "azurerm_linux_function_app" "functions_app" {
   name                       = var.functions_name
   location                   = var.location
   resource_group_name        = var.resource_group_name
-  app_service_plan_id        = azurerm_service_plan.functions_plan.id
+  service_plan_id            = azurerm_service_plan.functions_plan.id
   storage_account_name       = azurerm_storage_account.functions_storage.name
   storage_account_access_key = azurerm_storage_account.functions_storage.primary_access_key
-  os_type                    = var.os_type
+  os_type                    = "linux"
   version                    = var.function_app_version
 
   app_settings = {

@@ -1,6 +1,6 @@
 output "function_app_id" {
   description = "The ID of the Azure Function App."
-  value       = azurerm_function_app.functions_app.id
+  value       = azurerm_linux_function_app.functions_app.id
 }
 
 output "service_plan_id" {
@@ -9,6 +9,6 @@ output "service_plan_id" {
 }
 
 output "storage_account_name" {
-  description = "The name of the Storage Account created for the Function App."
+  description = "The name of the storage account used for the Function App."
   value       = azurerm_storage_account.functions_storage.name
 }

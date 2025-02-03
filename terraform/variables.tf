@@ -76,33 +76,32 @@ variable "log_analytics_workspace_id" {
 
 // Azure Functions Variables
 variable "functions_name" {
-  description = "Name of the Azure Functions app. Must be lowercase and 3-24 characters using only letters and numbers."
+  description = "Name of the Azure Functions app. Must be 3-24 characters, lowercase letters and numbers only."
   type        = string
 }
 
 variable "functions_sku" {
-  description = "SKU for the Azure Functions app (for compatibility; not used in the new module)."
+  description = "SKU for the Azure Functions app (e.g., P1v2 or Y1)."
   type        = string
 }
 
-variable "os_type" {
-  description = "OS type for the Function App (e.g., 'linux')."
+variable "app_service_plan_tier" {
+  description = "Tier for the App Service Plan (e.g., Dynamic or PremiumV2)."
   type        = string
-  default     = "linux"
 }
 
 variable "app_service_plan_size" {
-  description = "SKU for the Service Plan (e.g., 'Y1' for consumption or 'P1v2' for premium)."
+  description = "Size for the App Service Plan (e.g., Y1 for consumption, P1v2 for premium)."
   type        = string
 }
 
 variable "function_app_version" {
-  description = "Version for the Function App (e.g., '~3' or '~4')."
+  description = "Version for the Function App (e.g., ~3 or ~4)."
   type        = string
 }
 
 variable "functions_worker_runtime" {
-  description = "Worker runtime for the Function App (e.g., dotnet, python, node)."
+  description = "Worker runtime for the Functions app (e.g., dotnet, python, node)."
   type        = string
 }
 
