@@ -93,7 +93,7 @@ resource "azurerm_subnet_network_security_group_association" "ai" {
 }
 
 ###############################
-# Private DNS Zones (Existing Modules)
+# Private DNS Zones
 ###############################
 
 module "dns_blob" {
@@ -108,13 +108,12 @@ module "dns_blob" {
   tags = var.tags
 }
 
-
 module "dns_table" {
   source              = "./modules/private_dns_zone"
   name                = "privatelink.table.core.windows.net"
   resource_group_name = azurerm_resource_group.main.name
   virtual_networks_to_link = {
-    var.vnet_name = {
+    "${var.vnet_name}" = {
       virtual_network_id = module.vnet.vnet_id
     }
   }
@@ -125,17 +124,18 @@ module "dns_table" {
 # Services
 ###############################
 
-# Azure Functions (Premium, VNet integrated via separate resource if needed)
+# Azure Functions (Linux Function App in a consumption or dynamic plan)
 module "functions" {
-  source              = "./modules/azure_functions"
-  functions_name      = var.functions_name
-  sku                 = var.functions_sku
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  tags                = var.tags
+  source                 = "./modules/azure_functions"
+  functions_name         = var.functions_name
+  resource_group_name    = azurerm_resource_group.main.name
+  location               = var.location
+  app_service_plan_tier  = var.app_service_plan_tier
+  app_service_plan_size  = var.app_service_plan_size
+  function_app_version   = var.function_app_version
+  functions_worker_runtime = var.functions_worker_runtime
+  tags                   = var.tags
 }
-
-
 
 # Logic Apps Standard (VNet integrated with Managed Identity)
 module "logic_apps" {
@@ -152,18 +152,18 @@ module "logic_apps" {
 
 # Storage Account
 module "storage" {
-  source                   = "./modules/storage_account"
-  resource_group_name      = azurerm_resource_group.main.name
-  location                 = var.location
-  name                     = var.storage_account_name
-  account_kind             = var.storage_account_kind
-  account_tier             = var.storage_account_tier
-  replication_type         = var.storage_account_replication_type
-  is_hns_enabled           = var.is_hns_enabled
-  default_action           = var.default_action
-  ip_rules                 = var.ip_rules
+  source                     = "./modules/storage_account"
+  resource_group_name        = azurerm_resource_group.main.name
+  location                   = var.location
+  name                       = var.storage_account_name
+  account_kind               = var.storage_account_kind
+  account_tier               = var.storage_account_tier
+  replication_type           = var.storage_account_replication_type
+  is_hns_enabled             = var.is_hns_enabled
+  default_action             = var.default_action
+  ip_rules                   = var.ip_rules
   virtual_network_subnet_ids = var.virtual_network_subnet_ids
-  tags                     = var.tags
+  tags                       = var.tags
 }
 
 # Azure Cognitive Search
@@ -184,6 +184,7 @@ module "openai" {
   location            = var.location
   tags                = var.tags
 }
+
 
 
 /*

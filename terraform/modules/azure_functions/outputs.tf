@@ -4,8 +4,8 @@ output "function_app_id" {
 }
 
 output "service_plan_id" {
-  description = "The ID of the Function App Service Plan."
-  value       = azurerm_service_plan.functions_plan.id
+  description = "The ID of the App Service Plan."
+  value       = azurerm_app_service_plan.functions_plan.id
 }
 
 output "storage_account_name" {
