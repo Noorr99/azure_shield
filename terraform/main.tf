@@ -57,7 +57,7 @@ module "vnet" {
 #############################
 
 module "services_nsg" {
-  source              = "./modules/nsg"
+  source              = "./modules/network_security_group"
   name                = var.services_nsg_name
   resource_group_name = var.resource_group_name
   location            = var.location
@@ -67,7 +67,7 @@ module "services_nsg" {
 }
 
 module "pe_nsg" {
-  source              = "./modules/nsg"
+  source              = "./modules/network_security_group"
   name                = var.pe_nsg_name
   resource_group_name = var.resource_group_name
   location            = var.location
