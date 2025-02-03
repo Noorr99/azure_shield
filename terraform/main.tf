@@ -42,7 +42,6 @@ module "vnet" {
   address_space       = var.vnet_address_space
   tags                = var.tags
 
-  # Subnets for services and AI/private endpoints
   subnets = [
     {
       name                                          = var.services_subnet_name
@@ -60,7 +59,7 @@ module "vnet" {
 }
 
 ###############################
-# Network Security Groups (NSGs)
+# Network Security Groups (NSGs) – Using Your Existing Module
 ###############################
 
 module "nsg_services" {
@@ -94,7 +93,7 @@ resource "azurerm_subnet_network_security_group_association" "ai" {
 }
 
 ###############################
-# Private DNS Zones
+# Private DNS Zones (Reusing Existing Module)
 ###############################
 
 module "dns_blob" {
@@ -136,6 +135,18 @@ module "functions" {
   tags                = var.tags
 }
 
+# Logic Apps Standard (VNet integrated)
+module "logic_apps" {
+  source                         = "./modules/logic_apps"
+  logic_apps_name                = var.logic_apps_name
+  sku                            = var.logic_apps_sku
+  resource_group_name            = azurerm_resource_group.main.name
+  location                       = var.location
+  subnet_id                      = module.vnet.subnet_ids[var.services_subnet_name]
+  storage_account_name           = var.logic_apps_storage_account_name
+  storage_account_access_key     = module.storage.primary_access_key
+  tags                           = var.tags
+}
 
 # Storage Account
 module "storage" {
@@ -156,19 +167,6 @@ module "search" {
   location            = var.location
   sku                 = var.search_sku
   tags                = var.tags
-}
-
-# Logic Apps Standard (VNet integrated)
-module "logic_apps" {
-  source                         = "./modules/logic_apps"
-  logic_apps_name                = var.logic_apps_name
-  sku                            = var.logic_apps_sku
-  resource_group_name            = azurerm_resource_group.main.name
-  location                       = var.location
-  subnet_id                      = module.vnet.subnet_ids[var.services_subnet_name]
-  storage_account_name           = var.logic_apps_storage_account_name
-  storage_account_access_key     = module.storage.primary_access_key
-  tags                           = var.tags
 }
 
 # Azure OpenAI
