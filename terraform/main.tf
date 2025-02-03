@@ -5,11 +5,14 @@ terraform {
     container_name       = "tfstatesheilddev"
     key                  = "terraform.tfstate"
   }
-  
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      version = ">= 3.64.0"
+    }
+    azapi = {
+      source  = "azure/azapi"
+      version = ">= 1.0.0"
     }
   }
 }
@@ -17,6 +20,8 @@ terraform {
 provider "azurerm" {
   features {}
 }
+
+provider "azapi" {}
 
 data "azurerm_client_config" "current" {}
 
@@ -178,15 +183,24 @@ resource "azurerm_private_dns_zone_virtual_network_link" "azurewebsites_vnet_lin
 ######################
 
 ######################################
-# Azure OpenAI Service with Private Endpoint
+# Azure OpenAI Service with Private Endpoint (via azapi)
 ######################################
+# The azurerm provider does not (yet) support an OpenAI resource. Instead, we create a
+# Cognitive Services account of kind "OpenAI" using the azapi provider.
 
-resource "azurerm_openai_service" "openai" {
-  name                = "openaiexample"  # update to a globally unique name as needed
-  resource_group_name = azurerm_resource_group.services.name
-  location            = azurerm_resource_group.services.location
+resource "azapi_resource" "openai" {
+  type      = "Microsoft.CognitiveServices/accounts@2022-12-01"
+  name      = "openaiexample"  # update to a globally unique name as needed
+  location  = azurerm_resource_group.services.location
+  parent_id = azurerm_resource_group.services.id
 
-  sku_name = "S0"
+  body = jsonencode({
+    sku = {
+      name = "S0"
+    }
+    kind       = "OpenAI"
+    properties = {}
+  })
 }
 
 resource "azurerm_private_endpoint" "pe_openai" {
@@ -198,17 +212,22 @@ resource "azurerm_private_endpoint" "pe_openai" {
   private_service_connection {
     name                           = "openai-psc"
     is_manual_connection           = false
-    private_connection_resource_id = azurerm_openai_service.openai.id
-    subresource_names              = ["openai"]  # confirm the correct subresource name per provider documentation
+    # Use the ID from the azapi_resource (ignoring changes on that computed field)
+    private_connection_resource_id = azapi_resource.openai.id
+    subresource_names              = ["accounts"]
+  }
+
+  lifecycle {
+    # Ignore changes to the computed resource ID from azapi_resource
+    ignore_changes = [private_service_connection[0].private_connection_resource_id]
   }
 }
 
 resource "azurerm_private_dns_zone_group" "openai_dns" {
-  name                = "openai-dns"
-  private_endpoint_id = azurerm_private_endpoint.pe_openai.id
-
+  name                 = "openai-dns"
+  private_endpoint_id  = azurerm_private_endpoint.pe_openai.id
   private_dns_zone_ids = [
-    azurerm_private_dns_zone.openai.id
+    azurerm_private_dns_zone.openai.id,
   ]
 }
 
@@ -235,16 +254,15 @@ resource "azurerm_private_endpoint" "pe_search" {
     name                           = "search-psc"
     is_manual_connection           = false
     private_connection_resource_id = azurerm_search_service.search.id
-    subresource_names              = ["searchService"]  # confirm correct subresource name
+    subresource_names              = ["searchService"]
   }
 }
 
 resource "azurerm_private_dns_zone_group" "search_dns" {
-  name                = "search-dns"
-  private_endpoint_id = azurerm_private_endpoint.pe_search.id
-
+  name                 = "search-dns"
+  private_endpoint_id  = azurerm_private_endpoint.pe_search.id
   private_dns_zone_ids = [
-    azurerm_private_dns_zone.search.id
+    azurerm_private_dns_zone.search.id,
   ]
 }
 
@@ -253,12 +271,12 @@ resource "azurerm_private_dns_zone_group" "search_dns" {
 ######################################
 
 resource "azurerm_storage_account" "storage" {
-  name                     = "storagestgexample"  # update to a unique name
-  resource_group_name      = azurerm_resource_group.services.name
-  location                 = azurerm_resource_group.services.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  allow_blob_public_access = false
+  name                         = "storagestgexample"  # update to a unique name
+  resource_group_name          = azurerm_resource_group.services.name
+  location                     = azurerm_resource_group.services.location
+  account_tier                 = "Standard"
+  account_replication_type     = "LRS"
+  public_network_access_enabled = false
 
   network_rules {
     default_action             = "Deny"
@@ -282,11 +300,10 @@ resource "azurerm_private_endpoint" "pe_storage_blob" {
 }
 
 resource "azurerm_private_dns_zone_group" "storage_blob_dns" {
-  name                = "storage-blob-dns"
-  private_endpoint_id = azurerm_private_endpoint.pe_storage_blob.id
-
+  name                 = "storage-blob-dns"
+  private_endpoint_id  = azurerm_private_endpoint.pe_storage_blob.id
   private_dns_zone_ids = [
-    azurerm_private_dns_zone.blob.id
+    azurerm_private_dns_zone.blob.id,
   ]
 }
 
@@ -306,37 +323,60 @@ resource "azurerm_private_endpoint" "pe_storage_table" {
 }
 
 resource "azurerm_private_dns_zone_group" "storage_table_dns" {
-  name                = "storage-table-dns"
-  private_endpoint_id = azurerm_private_endpoint.pe_storage_table.id
-
+  name                 = "storage-table-dns"
+  private_endpoint_id  = azurerm_private_endpoint.pe_storage_table.id
   private_dns_zone_ids = [
-    azurerm_private_dns_zone.table.id
+    azurerm_private_dns_zone.table.id,
   ]
 }
 
 ######################################
 # Logic Apps Standard with VNet Integration
 ######################################
+# Logic Apps Standard requires an App Service plan and a storage account.
+# Here we create a dedicated storage account and service plan for Logic Apps.
+
+resource "azurerm_storage_account" "logicapps_storage" {
+  name                         = "logicappsstrg001"  # must be globally unique; add a suffix as needed
+  resource_group_name          = azurerm_resource_group.services.name
+  location                     = azurerm_resource_group.services.location
+  account_tier                 = "Standard"
+  account_replication_type     = "LRS"
+  public_network_access_enabled = false
+}
+
+resource "azurerm_service_plan" "logicapps_plan" {
+  name                = "logicapps-plan"
+  location            = azurerm_resource_group.services.location
+  resource_group_name = azurerm_resource_group.services.name
+  kind                = "Linux"
+  reserved            = true
+
+  sku {
+    tier = "Standard"
+    size = "S1"
+  }
+}
 
 resource "azurerm_logic_app_standard" "logicapps" {
   name                = "logicapps-example"
   resource_group_name = azurerm_resource_group.services.name
   location            = azurerm_resource_group.services.location
-  sku_name            = "Standard"
+
+  storage_account_name       = azurerm_storage_account.logicapps_storage.name
+  storage_account_access_key = azurerm_storage_account.logicapps_storage.primary_access_key
+  app_service_plan_id        = azurerm_service_plan.logicapps_plan.id
 
   identity {
     type = "SystemAssigned"
   }
-
-  # NOTE: VNet integration for Logic Apps Standard is typically achieved via integration service environment (ISE)
-  # or through specific network configuration within your workflows. Adjust as needed.
 }
 
 ######################################
 # Azure Functions (Premium Plan) with VNet Integration
 ######################################
 
-resource "azurerm_app_service_plan" "function_plan" {
+resource "azurerm_service_plan" "function_plan" {
   name                = "function-plan"
   location            = azurerm_resource_group.services.location
   resource_group_name = azurerm_resource_group.services.name
@@ -353,7 +393,7 @@ resource "azurerm_function_app" "functions" {
   name                       = "functionappexample"  # update to a unique name
   location                   = azurerm_resource_group.services.location
   resource_group_name        = azurerm_resource_group.services.name
-  app_service_plan_id        = azurerm_app_service_plan.function_plan.id
+  app_service_plan_id        = azurerm_service_plan.function_plan.id
   storage_account_name       = azurerm_storage_account.storage.name
   storage_account_access_key = azurerm_storage_account.storage.primary_access_key
 
@@ -372,12 +412,11 @@ resource "azurerm_function_app" "functions" {
 ######################################
 
 resource "azurerm_key_vault" "kv" {
-  name                     = "keyvaultexample"  # update to a unique name
-  location                 = azurerm_resource_group.services.location
-  resource_group_name      = azurerm_resource_group.services.name
-  tenant_id                = data.azurerm_client_config.current.tenant_id
-  sku_name                 = "standard"
-  soft_delete_enabled      = true
+  name                = "keyvaultexample"  # update to a unique name
+  location            = azurerm_resource_group.services.location
+  resource_group_name = azurerm_resource_group.services.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
   purge_protection_enabled = false
 
   network_acls {
@@ -412,27 +451,24 @@ resource "azurerm_private_endpoint" "pe_kv" {
 }
 
 resource "azurerm_private_dns_zone_group" "kv_dns" {
-  name                = "kv-dns"
-  private_endpoint_id = azurerm_private_endpoint.pe_kv.id
-
+  name                 = "kv-dns"
+  private_endpoint_id  = azurerm_private_endpoint.pe_kv.id
   private_dns_zone_ids = [
-    azurerm_private_dns_zone.vault.id
+    azurerm_private_dns_zone.vault.id,
   ]
 }
 
 ######################
-# Example: Azure Policy Assignment (Allowed Locations)
+# Azure Policy Assignment (Allowed Locations)
 ######################
 
 resource "azurerm_policy_assignment" "allowed_locations" {
   name                 = "allowed-locations"
   scope                = azurerm_resource_group.networking.id
   policy_definition_id = "/providers/Microsoft.Authorization/policyDefinitions/allowed-locations"
-  parameters = <<PARAMS
-{
-  "listOfAllowedLocations": {
-    "value": ["northeurope"]
-  }
-}
-PARAMS
+  parameters = jsonencode({
+    listOfAllowedLocations = {
+      value = ["northeurope"]
+    }
+  })
 }
