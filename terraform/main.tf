@@ -1,466 +1,526 @@
+
+###############################################################################
+# Configure Terraform and AzureRM Provider
+###############################################################################
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "3.50"
+      version = "~> 3.44.0"
     }
   }
-
+  required_version = ">= 1.3.0"
+  
   backend "azurerm" {
     resource_group_name  = "rg-terraform-storage"
     storage_account_name = "terraformstgaks99"
     container_name       = "tfstatesheilddev"
     key                  = "terraform.tfstate"
   }
+
 }
 
 provider "azurerm" {
   features {}
 }
 
-
-//////////////////////////////
-// Resource Groups         //
-//////////////////////////////
-
-resource "azurerm_resource_group" "rg_network" {
-  name     = var.network_rg_name
+###############################################################################
+# Resource Groups
+###############################################################################
+resource "azurerm_resource_group" "rg_networking" {
+  name     = "${var.prefix}-rg-networking"
   location = var.location
   tags     = var.tags
 }
 
 resource "azurerm_resource_group" "rg_services" {
-  name     = var.services_rg_name
+  name     = "${var.prefix}-rg-services"
   location = var.location
   tags     = var.tags
 }
 
-//////////////////////////////
-// Virtual Network & Subnets
-//////////////////////////////
-module "vnet" {
-  source = "./modules/virtual_network"
-
-  resource_group_name = azurerm_resource_group.rg_network.name
-  location            = var.location
-  vnet_name           = var.vnet_name
+###############################################################################
+# Virtual Network and Subnets
+###############################################################################
+resource "azurerm_virtual_network" "main_vnet" {
+  name                = "${var.prefix}-vnet"
+  location            = azurerm_resource_group.rg_networking.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
   address_space       = var.vnet_address_space
-
-  subnets = [
-    {
-      name                                          = var.subnet_services_name
-      address_prefixes                              = var.subnet_services_prefix
-      private_endpoint_network_policies_enabled     = true
-      private_link_service_network_policies_enabled = false
-    },
-    {
-      name                                          = var.subnet_ai_name
-      address_prefixes                              = var.subnet_ai_prefix
-      # For private endpoints, typically network policies must be disabled
-      # but your module might handle it. Adjust as needed.
-      private_endpoint_network_policies_enabled     = false
-      private_link_service_network_policies_enabled = true
-    }
-  ]
+  tags               = var.tags
 }
 
-//////////////////////////////
-// Network Security Groups  //
-//////////////////////////////
+resource "azurerm_subnet" "subnet_services" {
+  name                 = "${var.prefix}-subnet-services"
+  resource_group_name  = azurerm_resource_group.rg_networking.name
+  virtual_network_name = azurerm_virtual_network.main_vnet.name
+  address_prefixes     = [var.subnet_services_cidr]
+}
 
+resource "azurerm_subnet" "subnet_ai" {
+  name                 = "${var.prefix}-subnet-ai"
+  resource_group_name  = azurerm_resource_group.rg_networking.name
+  virtual_network_name = azurerm_virtual_network.main_vnet.name
+  address_prefixes     = [var.subnet_ai_cidr]
+}
+
+###############################################################################
+# NSGs for Subnets
+###############################################################################
 resource "azurerm_network_security_group" "nsg_services" {
-  name                = var.nsg_services_name
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg_network.name
+  name                = "${var.prefix}-nsg-services"
+  location            = azurerm_resource_group.rg_networking.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
   tags                = var.tags
-
-  security_rule {
-    name                       = "AllowOutboundInternet"
-    priority                   = 100
-    direction                  = "Outbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "*"
-    destination_address_prefix = "Internet"
-  }
-  # ... Additional rules as needed ...
-}
-
-resource "azurerm_subnet_network_security_group_association" "services_nsg_assoc" {
-  subnet_id                 = module.vnet.subnet_ids[var.subnet_services_name]
-  network_security_group_id = azurerm_network_security_group.nsg_services.id
 }
 
 resource "azurerm_network_security_group" "nsg_ai" {
-  name                = var.nsg_ai_name
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg_network.name
+  name                = "${var.prefix}-nsg-ai"
+  location            = azurerm_resource_group.rg_networking.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
   tags                = var.tags
-
-  # Typically for private endpoints, you might have more restrictive rules
-  # Example: allow Azure resources or certain whitelists only
-  security_rule {
-    name                       = "AllowAzureServices"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "*"
-    source_address_prefix      = "AzureFrontDoor.Backend"
-    destination_port_range     = "*"
-    destination_address_prefix = "*"
-    source_port_range          = "*"
-  }
-  # ... Additional rules ...
 }
 
+# Create NSG rules for 'services' subnet
+resource "azurerm_network_security_rule" "rules_nsg_services" {
+  for_each = { for rule in var.nsg_rules : rule.name => rule }
+  name                        = each.key
+  priority                    = each.value.priority
+  direction                   = each.value.direction
+  access                      = each.value.access
+  protocol                    = each.value.protocol
+  source_port_range           = each.value.source_port_range
+  destination_port_range      = each.value.destination_port_range
+  source_address_prefix       = each.value.source_address_prefix
+  destination_address_prefix  = each.value.destination_address_prefix
+  network_security_group_name = azurerm_network_security_group.nsg_services.name
+  resource_group_name         = azurerm_resource_group.rg_networking.name
+  description                 = each.value.description
+}
+
+# Associate the NSG with the 'services' subnet
+resource "azurerm_subnet_network_security_group_association" "services_nsg_assoc" {
+  subnet_id                 = azurerm_subnet.subnet_services.id
+  network_security_group_id = azurerm_network_security_group.nsg_services.id
+}
+
+# Create NSG rules for 'ai' subnet
+resource "azurerm_network_security_rule" "rules_nsg_ai" {
+  for_each = { for rule in var.nsg_rules : rule.name => rule }
+  name                        = each.key
+  priority                    = each.value.priority
+  direction                   = each.value.direction
+  access                      = each.value.access
+  protocol                    = each.value.protocol
+  source_port_range           = each.value.source_port_range
+  destination_port_range      = each.value.destination_port_range
+  source_address_prefix       = each.value.source_address_prefix
+  destination_address_prefix  = each.value.destination_address_prefix
+  network_security_group_name = azurerm_network_security_group.nsg_ai.name
+  resource_group_name         = azurerm_resource_group.rg_networking.name
+  description                 = each.value.description
+}
+
+# Associate the NSG with the 'ai' subnet
 resource "azurerm_subnet_network_security_group_association" "ai_nsg_assoc" {
-  subnet_id                 = module.vnet.subnet_ids[var.subnet_ai_name]
+  subnet_id                 = azurerm_subnet.subnet_ai.id
   network_security_group_id = azurerm_network_security_group.nsg_ai.id
 }
 
+###############################################################################
+# Private DNS Zones
+###############################################################################
+# List of private DNS zone names you require
+locals {
+  private_dns_zones = [
+    "privatelink.blob.core.windows.net",
+    "privatelink.table.core.windows.net",
+    "privatelink.search.windows.net",
+    "privatelink.openai.azure.com",
+    "privatelink.vaultcore.azure.net",
+    "privatelink.azurewebsites.net"
+  ]
+}
 
-////////////////////////////////
-// Private DNS Zones (New ones)
-////////////////////////////////
-module "dns_zone_blob" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.blob.core.windows.net"
-  resource_group_name = azurerm_resource_group.rg_network.name
-  virtual_networks_to_link = {
-    (module.vnet.name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg_network.name
-    }
+resource "azurerm_private_dns_zone" "main_zones" {
+  for_each            = toset(local.private_dns_zones)
+  name                = each.value
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  tags                = var.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "main_zone_links" {
+  for_each                                 = azurerm_private_dns_zone.main_zones
+  name                                     = "${each.value.name}-link"
+  resource_group_name                      = azurerm_resource_group.rg_networking.name
+  private_dns_zone_name                    = each.value.name
+  virtual_network_id                       = azurerm_virtual_network.main_vnet.id
+  registration_enabled                     = false
+}
+
+###############################################################################
+# Azure Key Vault (with optional private endpoint)
+###############################################################################
+resource "azurerm_key_vault" "main_kv" {
+  name                = "${var.prefix}-kv"
+  location            = azurerm_resource_group.rg_services.location
+  resource_group_name = azurerm_resource_group.rg_services.name
+  sku_name            = "standard"
+
+  # Turn off public access entirely
+  public_network_access_enabled = false 
+
+  tenant_id                      = data.azurerm_client_config.current.tenant_id
+  purge_protection_enabled       = true
+  soft_delete_enabled            = true
+  tags                           = var.tags
+}
+
+data "azurerm_client_config" "current" {}
+
+# Private endpoint for Key Vault (optional)
+resource "azurerm_private_endpoint" "kv_pe" {
+  name                = "${var.prefix}-pe-kv"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_ai.id
+
+  private_service_connection {
+    name                           = "kv-priv-connection"
+    private_connection_resource_id = azurerm_key_vault.main_kv.id
+    subresource_names              = ["vault"]
   }
+
   tags = var.tags
 }
 
-module "dns_zone_table" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.table.core.windows.net"
-  resource_group_name = azurerm_resource_group.rg_network.name
-  virtual_networks_to_link = {
-    (module.vnet.name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg_network.name
-    }
-  }
-  tags = var.tags
+resource "azurerm_private_dns_a_record" "kv_private_dns" {
+  name                = azurerm_key_vault.main_kv.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.vaultcore.azure.net"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.kv_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
 }
 
-module "dns_zone_search" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.search.windows.net"
-  resource_group_name = azurerm_resource_group.rg_network.name
-  virtual_networks_to_link = {
-    (module.vnet.name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg_network.name
-    }
-  }
-  tags = var.tags
-}
-
-module "dns_zone_openai" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.openai.azure.com"
-  resource_group_name = azurerm_resource_group.rg_network.name
-  virtual_networks_to_link = {
-    (module.vnet.name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg_network.name
-    }
-  }
-  tags = var.tags
-}
-
-module "dns_zone_webapps" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.azurewebsites.net"
-  resource_group_name = azurerm_resource_group.rg_network.name
-  virtual_networks_to_link = {
-    (module.vnet.name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg_network.name
-    }
-  }
-  tags = var.tags
-}
-
-# Key Vault DNS zone if you want private endpoint for vault
-module "dns_zone_kv" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.vaultcore.azure.net"
-  resource_group_name = azurerm_resource_group.rg_network.name
-  virtual_networks_to_link = {
-    (module.vnet.name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg_network.name
-    }
-  }
-  tags = var.tags
-}
-
-////////////////////////////////////////////////////////////
-// Azure Storage (Blob & Table) with Private Endpoint
-////////////////////////////////////////////////////////////
-resource "azurerm_storage_account" "this" {
-  name                     = var.storage_account_name
+###############################################################################
+# Azure Storage (with blob, table + private endpoint)
+###############################################################################
+resource "azurerm_storage_account" "main_sa" {
+  name                     = "${var.prefix}sa"
   resource_group_name      = azurerm_resource_group.rg_services.name
-  location                 = var.location
+  location                 = azurerm_resource_group.rg_services.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  kind                     = "StorageV2"
+  # Disable public access
   allow_blob_public_access = false
-  # Force private link usage
+  # For advanced networking:
+  enable_https_traffic_only          = true
+  is_hns_enabled                     = false
+  min_tls_version                    = "TLS1_2"
+  public_network_access_enabled      = false
+  tags = var.tags
+}
+
+# Private endpoint for blob
+resource "azurerm_private_endpoint" "storage_blob_pe" {
+  name                = "${var.prefix}-pe-blob"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_ai.id
+
+  private_service_connection {
+    name                           = "blob-priv-connection"
+    private_connection_resource_id = azurerm_storage_account.main_sa.id
+    subresource_names              = ["blob"]
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_private_dns_a_record" "storage_blob_a_record" {
+  name                = azurerm_storage_account.main_sa.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.blob.core.windows.net"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.storage_blob_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
+}
+
+# Private endpoint for table
+resource "azurerm_private_endpoint" "storage_table_pe" {
+  name                = "${var.prefix}-pe-table"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_ai.id
+
+  private_service_connection {
+    name                           = "table-priv-connection"
+    private_connection_resource_id = azurerm_storage_account.main_sa.id
+    subresource_names              = ["table"]
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_private_dns_a_record" "storage_table_a_record" {
+  name                = azurerm_storage_account.main_sa.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.table.core.windows.net"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.storage_table_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
+}
+
+###############################################################################
+# Azure Cognitive Search (with private endpoint)
+###############################################################################
+resource "azurerm_search_service" "main_search" {
+  name                = "${var.prefix}-search"
+  resource_group_name = azurerm_resource_group.rg_services.name
+  location            = azurerm_resource_group.rg_services.location
+  sku                 = "standard"  # adjust as needed
+  replica_count       = 1
+  partition_count     = 1
+
+  # Restrict public access
   public_network_access_enabled = false
+  tags                          = var.tags
+}
+
+resource "azurerm_private_endpoint" "search_pe" {
+  name                = "${var.prefix}-pe-search"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_ai.id
+
+  private_service_connection {
+    name                           = "search-priv-connection"
+    private_connection_resource_id = azurerm_search_service.main_search.id
+    subresource_names              = ["searchService"]
+  }
 
   tags = var.tags
 }
 
-# Private endpoint for Blob
-module "pe_storage_blob" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${azurerm_storage_account.this.name}-blob"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg_network.name
-  subnet_id                      = module.vnet.subnet_ids[var.subnet_ai_name]
-  tags                           = var.tags
-  private_connection_resource_id = azurerm_storage_account.this.id
-  subresource_name               = "blob"
-  private_dns_zone_group_name    = "blobPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_zone_blob.id]
+resource "azurerm_private_dns_a_record" "search_a_record" {
+  name                = azurerm_search_service.main_search.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.search.windows.net"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.search_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
 }
 
-# Private endpoint for Table
-module "pe_storage_table" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${azurerm_storage_account.this.name}-table"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg_network.name
-  subnet_id                      = module.vnet.subnet_ids[var.subnet_ai_name]
-  tags                           = var.tags
-  private_connection_resource_id = azurerm_storage_account.this.id
-  subresource_name               = "table"
-  private_dns_zone_group_name    = "tablePrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_zone_table.id]
-}
+###############################################################################
+# Azure OpenAI (with private endpoint)
+###############################################################################
+# For Azure OpenAI, you must have a valid Azure OpenAI resource already 
+# approved in your subscription. This sample is conceptual.
 
-////////////////////////////////////////////////////////////
-// Azure Cognitive Search with Private Endpoint
-////////////////////////////////////////////////////////////
-resource "azurerm_search_service" "this" {
-  name                = var.search_name
+resource "azurerm_openai_account" "main_openai" {
+  name                = "${var.prefix}-openai"
+  location            = azurerm_resource_group.rg_services.location
   resource_group_name = azurerm_resource_group.rg_services.name
-  location            = var.location
-  sku                 = var.search_sku
 
-  # This ensures no public endpoint
-  public_network_access_disabled = true
-
-  tags = var.tags
-}
-
-module "pe_search" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${azurerm_search_service.this.name}"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg_network.name
-  subnet_id                      = module.vnet.subnet_ids[var.subnet_ai_name]
-  tags                           = var.tags
-  private_connection_resource_id = azurerm_search_service.this.id
-  subresource_name               = "searchService"
-  private_dns_zone_group_name    = "searchPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_zone_search.id]
-}
-
-////////////////////////////////////////////////////////////
-// Azure OpenAI with Private Endpoint
-////////////////////////////////////////////////////////////
-resource "azurerm_openai_account" "this" {
-  name                = var.openai_name
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg_services.name
-  sku_name            = var.openai_sku
+  sku {
+    name = "s0"
+    capacity = 1
+  }
 
   public_network_access_enabled = false
-  # Possibly: identity { type = "SystemAssigned" } if you want MI
+  tags                          = var.tags
+}
+
+resource "azurerm_private_endpoint" "openai_pe" {
+  name                = "${var.prefix}-pe-openai"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_ai.id
+
+  private_service_connection {
+    name                           = "openai-priv-connection"
+    private_connection_resource_id = azurerm_openai_account.main_openai.id
+    subresource_names              = ["OpenAi"]
+  }
 
   tags = var.tags
 }
 
-module "pe_openai" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${azurerm_openai_account.this.name}"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg_network.name
-  subnet_id                      = module.vnet.subnet_ids[var.subnet_ai_name]
-  tags                           = var.tags
-  private_connection_resource_id = azurerm_openai_account.this.id
-  subresource_name               = "account"
-  private_dns_zone_group_name    = "openAIDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_zone_openai.id]
+resource "azurerm_private_dns_a_record" "openai_a_record" {
+  name                = azurerm_openai_account.main_openai.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.openai.azure.com"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.openai_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
 }
 
-////////////////////////////////////////////////////////////
-// Logic Apps (Standard) with VNet Integration
-////////////////////////////////////////////////////////////
-resource "azurerm_logic_app_standard" "this" {
-  name                = var.logic_app_name
-  location            = var.location
+###############################################################################
+# Azure Functions (Premium plan + VNet Integration)
+###############################################################################
+resource "azurerm_service_plan" "func_plan" {
+  name                = "${var.prefix}-func-premium-plan"
+  location            = azurerm_resource_group.rg_services.location
   resource_group_name = azurerm_resource_group.rg_services.name
+  os_type             = "linux"
+  sku_name            = "EP1" # Premium plan
+  tags                = var.tags
+}
+
+resource "azurerm_linux_function_app" "main_function" {
+  name                       = "${var.prefix}-function"
+  resource_group_name        = azurerm_resource_group.rg_services.name
+  location                   = azurerm_resource_group.rg_services.location
+  service_plan_id            = azurerm_service_plan.func_plan.id
+  storage_account_name       = azurerm_storage_account.main_sa.name
+  storage_account_access_key = azurerm_storage_account.main_sa.primary_access_key
 
   # System-assigned managed identity
   identity {
     type = "SystemAssigned"
   }
 
-  # For VNet integration with logic app standard
-  # The main property is plan; you can specify sku size
-  plan {
-    name     = "${var.logic_app_name}-plan"
-    sku_name = "S1"
-  }
+  # Restrict public access 
+  https_only              = true
+  public_network_access_enabled = false
 
-  # If using direct VNet injection, use below:
-  # (some logic app standard setups require ASE or setting up
-  #  the app settings for WEBSITE_VNET_ROUTE_ALL, etc.)
   app_settings = {
-    "WEBSITE_RUN_FROM_PACKAGE" = "0"
-    "WEBSITE_VNET_ROUTE_ALL"   = "1"
+    "WEBSITE_RUN_FROM_PACKAGE" = "1"
+    # Additional settings
   }
 
-  # If you want to connect to the same subnet as your Azure Functions,
-  # you can do so using azurerm_subnet and 'virtual_network_subnet_id'
-  # in an App Service environment. For simpler scenarios, you can
-  # replicate the approach used by function apps (below).
-  #
-  # For example, if Logic Apps Standard is allowed to integrate with
-  # the same approach as Azure Functions:
-  # site_config {
-  #   vnet_route_all_enabled = true
-  # }
-  # ...
-  
+  site_config {
+    # Enable VNet Integration for inbound/outbound
+    vnet_route_all_enabled = true
+    # If you want to assign a subnet specifically for the integration,
+    # you'll likely use a separate Subnet or the same 'services' subnet
+  }
+
   tags = var.tags
 }
 
-# If you want a private endpoint for the Logic App itself (rare),
-# you can do so using "privatelink.azurewebsites.net" subresource:
-# module "pe_logic_app" { ... }
-
-////////////////////////////////////////////////////////////
-// Azure Functions (Premium) with VNet Integration
-////////////////////////////////////////////////////////////
-
-# 1. App Service Plan (Premium)
-resource "azurerm_service_plan" "function_plan" {
-  name                = var.function_app_plan_name
+# Private Endpoint for Azure Functions is optional 
+# (since it can integrate over VNet). Shown for completeness:
+resource "azurerm_private_endpoint" "function_pe" {
+  name                = "${var.prefix}-pe-func"
   location            = var.location
-  resource_group_name = azurerm_resource_group.rg_services.name
-  os_type             = "Linux"
-  sku_name            = var.function_app_sku  # e.g., "EP1"
-  tags                = var.tags
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_services.id
+
+  private_service_connection {
+    name                           = "function-priv-connection"
+    private_connection_resource_id = azurerm_linux_function_app.main_function.id
+    subresource_names              = ["sites"]
+  }
+
+  tags = var.tags
 }
 
-# 2. Function App
-resource "azurerm_linux_function_app" "this" {
-  name                       = var.function_app_name
-  location                   = var.location
-  resource_group_name        = azurerm_resource_group.rg_services.name
-  service_plan_id            = azurerm_service_plan.function_plan.id
+resource "azurerm_private_dns_a_record" "function_a_record" {
+  name                = azurerm_linux_function_app.main_function.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.azurewebsites.net"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.function_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
+}
 
-  # System assigned managed identity for Key Vault, etc.
+###############################################################################
+# Logic Apps (Standard) - VNet Integration
+###############################################################################
+resource "azurerm_logic_app_standard" "main_logicapp" {
+  name                = "${var.prefix}-logicapp"
+  location            = azurerm_resource_group.rg_services.location
+  resource_group_name = azurerm_resource_group.rg_services.name
+  sku_name            = "Standard"
+  sku_plan_name       = "WorkflowStandardFree"
+  sku_plan_capacity   = 1
+
   identity {
     type = "SystemAssigned"
   }
 
-  # Force incoming traffic to come through private endpoints or integration
-  # e.g., site_config { ftps_state = "Disabled" } to restrict ftp
-  site_config {
-    # VNet route
-    vnet_route_all_enabled = true
-    # Additional settings as needed
+  # Force private access
+  inbound_ip_restriction {
+    name                                         = "Allow-Internal"
+    action                                       = "Allow"
+    service_tag                                  = null
+    virtual_network_subnet_id                    = azurerm_subnet.subnet_services.id
   }
-
-  # Mark public network disabled
-  public_network_access_enabled = false
-
-  # VNet Integration (SWIFT or regional) can be done in multiple ways:
-  # For Premium plans, you typically create a "azurerm_app_service_virtual_network_swift_connection"
-  # or use 'ip_restriction' + private endpoint. 
-  # We'll show a Swift Connection example below.
 
   tags = var.tags
 }
 
-# 3. Swift VNet Integration for the Function
-resource "azurerm_app_service_virtual_network_swift_connection" "function_vnet_integration" {
-  app_service_id = azurerm_linux_function_app.this.id
-  subnet_id      = module.vnet.subnet_ids[var.subnet_services_name]
-}
-
-# 4. Private Endpoint (Optional) for the Function:
-module "pe_function" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${azurerm_linux_function_app.this.name}"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg_network.name
-  subnet_id                      = module.vnet.subnet_ids[var.subnet_ai_name]
-  tags                           = var.tags
-  private_connection_resource_id = azurerm_linux_function_app.this.id
-  subresource_name               = "site" 
-  private_dns_zone_group_name    = "functionAppDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_zone_webapps.id]
-}
-
-
-////////////////////////////////////////////////////////////
-// Key Vault (Optional Private Endpoint) – if needed
-////////////////////////////////////////////////////////////
-# If you want to store secrets for your Functions/Logic App:
-# Reuse your Key Vault module or create a new resource. Example:
-/*
-module "key_vault" {
-  source              = "./modules/key_vault"
-  name                = "kv-neu-001"
-  resource_group_name = azurerm_resource_group.rg_services.name
+# Private Endpoint for Logic App (Optional)
+resource "azurerm_private_endpoint" "logicapp_pe" {
+  name                = "${var.prefix}-pe-logicapp"
   location            = var.location
-  tenant_id           = var.tenant_id
-  sku_name            = "standard"
-  public_network_access_enabled = false
-  # ...
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  subnet_id           = azurerm_subnet.subnet_services.id
+
+  private_service_connection {
+    name                           = "logicapp-priv-connection"
+    private_connection_resource_id = azurerm_logic_app_standard.main_logicapp.id
+    subresource_names              = ["sites"] 
+  }
+
+  tags = var.tags
 }
 
-module "pe_keyvault" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-kv-neu-001"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg_network.name
-  subnet_id                      = module.vnet.subnet_ids[var.subnet_ai_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.key_vault.id
-  subresource_name               = "vault"
-  private_dns_zone_group_name    = "KeyVaultPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_zone_kv.id]
-}
-*/
-
-data "azurerm_client_config" "current" {}
-
-# If you need role assignments for managed identities:
-resource "azurerm_role_assignment" "logicapp_kv_access" {
-  principal_id         = azurerm_logic_app_standard.this.identity[0].principal_id
-  scope                = module.key_vault.id
-  role_definition_name = "Key Vault Secrets User"
-  depends_on           = [azurerm_logic_app_standard.this, module.key_vault]
+resource "azurerm_private_dns_a_record" "logicapp_a_record" {
+  name                = azurerm_logic_app_standard.main_logicapp.name
+  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.azurewebsites.net"].name
+  resource_group_name = azurerm_resource_group.rg_networking.name
+  records             = [azurerm_private_endpoint.logicapp_pe.private_service_connection[0].private_ip_address]
+  ttl                 = 300
 }
 
-resource "azurerm_role_assignment" "function_kv_access" {
-  principal_id         = azurerm_linux_function_app.this.identity[0].principal_id
-  scope                = module.key_vault.id
-  role_definition_name = "Key Vault Secrets User"
-  depends_on           = [azurerm_linux_function_app.this, module.key_vault]
+###############################################################################
+# Example Azure Policy: Enforce location & private endpoint usage
+###############################################################################
+data "azurerm_policy_definition" "allowed_locations" {
+  # This references a built-in policy. You can also create your own custom definition
+  display_name = "Allowed locations"
+  name         = "c2f7d0aa-6f86-4ac9-90a6-27d3d15163e6" 
+}
+
+resource "azurerm_policy_assignment" "allowed_locations_assignment" {
+  name                 = "${var.prefix}-allowed-locations"
+  scope                = azurerm_resource_group.rg_services.id
+  policy_definition_id = data.azurerm_policy_definition.allowed_locations.id
+  location            = var.location
+
+  # We only allow "northeurope" in this example
+  parameters = jsonencode({
+    listOfAllowedLocations = {
+      value = ["northeurope"]
+    }
+  })
+}
+
+# Example built-in policy to require private endpoints for Storage
+data "azurerm_policy_definition" "require_private_endpoints_for_storage" {
+  display_name = "Storage accounts should use private link"
+  name         = "c179a8cc-0987-4d6f-a7b4-2d51aa49e8d7" 
+}
+
+resource "azurerm_policy_assignment" "require_private_endpoints_for_storage_assignment" {
+  name                 = "${var.prefix}-require-pe-storage"
+  scope                = azurerm_resource_group.rg_services.id
+  policy_definition_id = data.azurerm_policy_definition.require_private_endpoints_for_storage.id
+  location             = var.location
+}
+
+###############################################################################
+# Example RBAC Role Assignments for Managed Identities
+###############################################################################
+# For example: give the Function's identity access to read secrets in Key Vault
+resource "azurerm_role_assignment" "function_kv_secrets_user" {
+  scope                            = azurerm_key_vault.main_kv.id
+  role_definition_name             = "Key Vault Secrets User"
+  principal_id                     = azurerm_linux_function_app.main_function.identity[0].principal_id
+  skip_service_principal_aad_check = true
+}
+
+# For example: give the Logic App identity read blob data from Storage
+resource "azurerm_role_assignment" "logicapp_blob_reader" {
+  scope                            = azurerm_storage_account.main_sa.id
+  role_definition_name             = "Storage Blob Data Reader"
+  principal_id                     = azurerm_logic_app_standard.main_logicapp.identity[0].principal_id
+  skip_service_principal_aad_check = true
 }

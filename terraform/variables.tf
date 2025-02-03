@@ -1,142 +1,70 @@
-//////////////////////////////
-// Region & Resource Groups //
-//////////////////////////////
+variable "prefix" {
+  type        = string
+  description = "Prefix for all resource names"
+  default     = "demo"
+}
 
 variable "location" {
-  description = "Specifies the Azure region where resources will be created."
   type        = string
+  description = "Azure Region"
   default     = "northeurope"
 }
 
-variable "network_rg_name" {
-  description = "Name of the resource group to hold networking resources (VNet, subnets, etc.)."
-  type        = string
-}
-
-variable "services_rg_name" {
-  description = "Name of the resource group to hold service resources (Azure Functions, Logic Apps, OpenAI, etc.)."
-  type        = string
-}
-
-//////////////////////////////
-// Networking & Subnets    //
-//////////////////////////////
-
-variable "vnet_name" {
-  description = "Specifies the name of the Azure virtual network."
-  type        = string
-}
-
 variable "vnet_address_space" {
-  description = "Specifies the address space for the Azure virtual network."
   type        = list(string)
+  description = "Address space for VNet"
+  default     = ["10.0.0.0/16"]
 }
 
-variable "subnet_services_name" {
-  description = "Specifies the name of the subnet for services (Functions/Logic Apps)."
+variable "subnet_services_cidr" {
   type        = string
+  description = "CIDR for 'services' subnet"
+  default     = "10.0.1.0/24"
 }
 
-variable "subnet_services_prefix" {
-  description = "Address prefix for the services subnet."
-  type        = list(string)
-}
-
-variable "subnet_ai_name" {
-  description = "Specifies the name of the subnet for private endpoints (OpenAI, Cognitive Search, Storage, etc.)."
+variable "subnet_ai_cidr" {
   type        = string
+  description = "CIDR for 'ai' subnet"
+  default     = "10.0.2.0/24"
 }
 
-variable "subnet_ai_prefix" {
-  description = "Address prefix for the private endpoints subnet."
-  type        = list(string)
+# Example NSG rules—adjust to your needs
+variable "nsg_rules" {
+  type        = list(object({
+    name                       = string
+    priority                   = number
+    direction                  = string
+    access                     = string
+    protocol                   = string
+    source_port_range          = string
+    destination_port_range     = string
+    source_address_prefix      = string
+    destination_address_prefix = string
+    description                = string
+  }))
+  description = "List of NSG rules to apply to each subnet."
+  default = [
+    {
+      name                       = "AllowAzureLoadBalancer"
+      priority                   = 100
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      source_port_range          = "*"
+      destination_port_range     = "*"
+      source_address_prefix      = "AzureLoadBalancer"
+      destination_address_prefix = "*"
+      description                = "Allow inbound from Azure Load Balancer"
+    }
+    # Add more custom rules as needed
+  ]
 }
 
-//////////////////////////////
-// NSG Variables (Optional) //
-//////////////////////////////
-
-variable "nsg_services_name" {
-  description = "Name of the NSG for the services subnet."
-  type        = string
-  default     = "nsg-services"
-}
-
-variable "nsg_ai_name" {
-  description = "Name of the NSG for the AI/private endpoints subnet."
-  type        = string
-  default     = "nsg-ai"
-}
-
-//////////////////////////////
-// Azure OpenAI Variables   //
-//////////////////////////////
-variable "openai_name" {
-  description = "Name of the Azure OpenAI resource."
-  type        = string
-}
-
-variable "openai_sku" {
-  description = "SKU for Azure OpenAI resource."
-  type        = string
-  default     = "S0"
-}
-
-//////////////////////////////
-// Cognitive Search         //
-//////////////////////////////
-variable "search_name" {
-  description = "Name of Azure Cognitive Search service."
-  type        = string
-}
-
-variable "search_sku" {
-  description = "SKU for Azure Cognitive Search (e.g., 'standard', 'basic', etc.)."
-  type        = string
-  default     = "standard"
-}
-
-//////////////////////////////
-// Storage Account          //
-//////////////////////////////
-variable "storage_account_name" {
-  description = "Name of the Storage Account for blob & table."
-  type        = string
-}
-
-//////////////////////////////
-// Logic Apps (Standard)    //
-//////////////////////////////
-variable "logic_app_name" {
-  description = "Name of the Logic App (Standard)."
-  type        = string
-}
-
-//////////////////////////////
-// Azure Functions (Premium)//
-//////////////////////////////
-variable "function_app_name" {
-  description = "Name of the Azure Function App."
-  type        = string
-}
-
-variable "function_app_plan_name" {
-  description = "Name of the App Service Plan for the function app."
-  type        = string
-  default     = "asp-function-premium"
-}
-
-variable "function_app_sku" {
-  description = "SKU for the function app service plan. E.g., 'EP1', 'EP2' for Premium."
-  type        = string
-  default     = "EP1"
-}
-
-//////////////////////////////
-// Tags                     //
-//////////////////////////////
 variable "tags" {
-  description = "Specifies tags to apply to all resources."
   type        = map(string)
-  default     = {}
+  description = "Common tags for resources"
+  default     = {
+    environment = "dev"
+    owner       = "team-xyz"
+  }
 }
