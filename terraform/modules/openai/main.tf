@@ -43,6 +43,7 @@ resource "azurerm_cognitive_deployment" "deployment" {
   }
 }
 
+/*
 resource "azurerm_monitor_diagnostic_setting" "settings" {
   name                       = "DiagnosticsSettings"
   target_resource_id         = azurerm_cognitive_account.openai.id
@@ -64,3 +65,5 @@ resource "azurerm_monitor_diagnostic_setting" "settings" {
     category = "AllMetrics"
   }
 }
+
+*/
