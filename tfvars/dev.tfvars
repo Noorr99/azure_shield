@@ -72,19 +72,19 @@ nsg_ai_rules = [
   }
 ]
 
-# Log Analytics Workspace ID
+# Log Analytics Workspace ID (update with your actual workspace resource ID)
 log_analytics_workspace_id = "/subscriptions/your_subscription_id/resourceGroups/your_rg/providers/Microsoft.OperationalInsights/workspaces/your_workspace"
 
 # Azure Functions
-functions_name           = "func-ne"
-functions_sku            = "P1v2"
-app_service_plan_tier    = "Dynamic"    # or "PremiumV2" as needed
-app_service_plan_size    = "Y1"         # e.g., Y1 for consumption; P1v2 for premium
-function_app_version     = "~4"         # or "~3" as required
-functions_worker_runtime = "dotnet"     # or "python", "node", etc.
+functions_name           = "funcnesa"          # Must be lowercase, no hyphens, 3-24 characters.
+functions_sku            = "P1v2"              # Not used in the new module but provided for legacy compatibility.
+os_type                  = "linux"
+app_service_plan_size    = "Y1"                # e.g., "Y1" for consumption; "P1v2" for premium.
+function_app_version     = "~4"                # e.g., "~4" or "~3".
+functions_worker_runtime = "dotnet"            # e.g., "dotnet", "python", "node".
 
 # Logic Apps
-logic_apps_name                           = "logicapps-ne"
+logic_apps_name                           = "logicappsne"
 logic_apps_sku                            = "Standard"
 logic_apps_storage_account_name           = "stlogicappsne"
 logic_apps_storage_account_access_key     = "your_logicapps_storage_access_key_here"
@@ -100,8 +100,8 @@ ip_rules                         = []
 virtual_network_subnet_ids       = []
 
 # Azure Cognitive Search
-search_service_name = "search-ne"
+search_service_name = "searchne"
 search_sku          = "standard"
 
 # Azure OpenAI
-openai_name = "openai-ne"
+openai_name = "openaine"
