@@ -15,7 +15,7 @@ variable "location" {
 
 variable "security_rules" {
   description = "(Optional) Specifies the security rules of the network security group"
-  type        = list(object)
+  type        = list(any)
   default     = []
 }
 
