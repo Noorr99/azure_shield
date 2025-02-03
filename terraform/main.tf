@@ -131,9 +131,10 @@ module "functions" {
   sku                 = var.functions_sku
   resource_group_name = azurerm_resource_group.main.name
   location            = var.location
-  # Removed unsupported virtual_network_subnet_id argument.
+  subnet_id           = module.vnet.subnet_ids[var.services_subnet_name]
   tags                = var.tags
 }
+
 
 # Logic Apps Standard (VNet integrated with Managed Identity)
 module "logic_apps" {
