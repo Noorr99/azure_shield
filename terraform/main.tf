@@ -101,12 +101,13 @@ module "dns_blob" {
   name                = "privatelink.blob.core.windows.net"
   resource_group_name = azurerm_resource_group.main.name
   virtual_networks_to_link = {
-    var.vnet_name = {
+    "${var.vnet_name}" = {
       virtual_network_id = module.vnet.vnet_id
     }
   }
   tags = var.tags
 }
+
 
 module "dns_table" {
   source              = "./modules/private_dns_zone"
@@ -131,7 +132,6 @@ module "functions" {
   sku                 = var.functions_sku
   resource_group_name = azurerm_resource_group.main.name
   location            = var.location
-  subnet_id           = module.vnet.subnet_ids[var.services_subnet_name]
   tags                = var.tags
 }
 
