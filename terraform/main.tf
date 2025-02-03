@@ -150,14 +150,20 @@ module "logic_apps" {
 
 # Storage Account
 module "storage" {
-  source                 = "./modules/storage_account"
-  resource_group_name    = azurerm_resource_group.main.name
-  location               = var.location
-  storage_account_name   = var.storage_account_name
-  account_tier           = var.storage_account_tier
-  account_replication_type = var.storage_account_replication_type
-  tags                   = var.tags
+  source                   = "./modules/storage_account"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = var.location
+  name                     = var.storage_account_name
+  account_kind             = var.storage_account_kind    // if you have this variable (default "StorageV2")
+  account_tier             = var.storage_account_tier
+  replication_type         = var.storage_account_replication_type
+  is_hns_enabled           = var.is_hns_enabled          // ensure this variable is defined
+  default_action           = var.default_action          // ensure this variable is defined
+  ip_rules                 = var.ip_rules                // ensure this variable is defined
+  virtual_network_subnet_ids = var.virtual_network_subnet_ids  // ensure this variable is defined
+  tags                     = var.tags
 }
+
 
 # Azure Cognitive Search
 module "search" {
