@@ -1,70 +1,68 @@
-variable "prefix" {
-  type        = string
-  description = "Prefix for all resource names"
-  default     = "demo"
-}
-
+# variables.tf
 variable "location" {
-  type        = string
-  description = "Azure Region"
+  description = "Azure region for resources"
   default     = "northeurope"
 }
 
+variable "resource_group_name" {
+  description = "Name for the main resource group"
+  default     = "rg-ai-main-neu"
+}
+
 variable "vnet_address_space" {
-  type        = list(string)
-  description = "Address space for VNet"
-  default     = ["10.0.0.0/16"]
+  description = "Address space for the virtual network"
+  default     = "10.0.0.0/16"
 }
 
 variable "subnet_services_cidr" {
-  type        = string
-  description = "CIDR for 'services' subnet"
+  description = "CIDR for services subnet"
   default     = "10.0.1.0/24"
 }
 
 variable "subnet_ai_cidr" {
-  type        = string
-  description = "CIDR for 'ai' subnet"
+  description = "CIDR for AI subnet"
   default     = "10.0.2.0/24"
 }
 
-# Example NSG rules—adjust to your needs
-variable "nsg_rules" {
-  type        = list(object({
-    name                       = string
-    priority                   = number
-    direction                  = string
-    access                     = string
-    protocol                   = string
-    source_port_range          = string
-    destination_port_range     = string
-    source_address_prefix      = string
-    destination_address_prefix = string
-    description                = string
-  }))
-  description = "List of NSG rules to apply to each subnet."
+variable "private_dns_zones" {
+  description = "List of private DNS zones"
+  type        = list(string)
   default = [
-    {
-      name                       = "AllowAzureLoadBalancer"
-      priority                   = 100
-      direction                  = "Inbound"
-      access                     = "Allow"
-      protocol                   = "*"
-      source_port_range          = "*"
-      destination_port_range     = "*"
-      source_address_prefix      = "AzureLoadBalancer"
-      destination_address_prefix = "*"
-      description                = "Allow inbound from Azure Load Balancer"
-    }
-    # Add more custom rules as needed
+    "privatelink.blob.core.windows.net",
+    "privatelink.table.core.windows.net",
+    "privatelink.search.windows.net",
+    "privatelink.openai.azure.com",
+    "privatelink.vaultcore.azure.net",
+    "privatelink.azurewebsites.net"
   ]
 }
 
-variable "tags" {
-  type        = map(string)
-  description = "Common tags for resources"
-  default     = {
-    environment = "dev"
-    owner       = "team-xyz"
-  }
+variable "storage_account_name" {
+  description = "Name for the storage account"
+  default     = "staiexample001"
+}
+
+variable "search_service_name" {
+  description = "Name for Azure Cognitive Search"
+  default     = "srch-ai-example"
+}
+
+variable "openai_account_name" {
+  description = "Name for Azure OpenAI account"
+  default     = "openai-example-account"
+}
+
+variable "function_app_name" {
+  description = "Name for Azure Function App"
+  default     = "func-ai-example"
+}
+
+variable "logic_app_name" {
+  description = "Name for Logic App"
+  default     = "logic-ai-example"
+}
+
+variable "key_vault_name" {
+  description = "Name for Key Vault"
+  default     = "kv-ai-example"
 }
