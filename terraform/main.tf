@@ -19,7 +19,6 @@ provider "azurerm" {
 
 data "azurerm_client_config" "current" {}
 
-
 #############################
 # Resource Group
 #############################
@@ -29,9 +28,8 @@ resource "azurerm_resource_group" "rg" {
   tags     = var.tags
 }
 
-
 #############################
-# Virtual Network & Subnets #
+# Virtual Network & Subnets
 #############################
 module "vnet" {
   source              = "./modules/virtual_network"
@@ -66,7 +64,7 @@ module "services_nsg" {
   location                   = var.location
   security_rules             = var.services_nsg_rules
   tags                       = var.tags
-  log_analytics_workspace_id = var.log_analytics_workspace_id
+  # NOTE: Diagnostic settings resource in this module has been removed or commented out.
 }
 
 module "pe_nsg" {
@@ -76,7 +74,7 @@ module "pe_nsg" {
   location                   = var.location
   security_rules             = var.pe_nsg_rules
   tags                       = var.tags
-  log_analytics_workspace_id = var.log_analytics_workspace_id
+  # NOTE: Diagnostic settings resource in this module has been removed or commented out.
 }
 
 resource "azurerm_subnet_network_security_group_association" "services_assoc" {
@@ -164,12 +162,12 @@ module "storage_table_private_endpoint" {
 }
 
 #############################
-# Azure OpenAI & Endpoints
+# Azure OpenAI (Diagnostics Removed)
 #############################
 module "openai" {
   source                     = "./modules/openai"
   resource_group_name        = azurerm_resource_group.rg.name
-  location                   = "eastus"  # Use a region where OpenAI is supported.
+  location                   = "eastus"  # Use a supported region for OpenAI
   name                       = var.openai_name
   sku_name                   = var.openai_sku
   tags                       = var.tags
@@ -177,37 +175,20 @@ module "openai" {
   public_network_access_enabled = false
   deployments                   = var.openai_deployments
   log_analytics_workspace_id    = var.log_analytics_workspace_id
+  # NOTE: Diagnostic settings resource in this module has been removed or commented out.
 }
 
-module "openai_private_dns_zone" {
-  source                   = "./modules/private_dns_zone"
-  name                     = "privatelink.openai.azure.com"
-  resource_group_name      = azurerm_resource_group.rg.name
-  virtual_networks_to_link = {
-    (var.vnet_name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg.name
-    }
-  }
-  tags = var.tags
-}
-
-module "openai_private_endpoint" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.openai.name}"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg.name
-  subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.openai.id
-  is_manual_connection           = false
-  subresource_name               = "openai"
-  private_dns_zone_group_name    = "OpenAiPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [ module.openai_private_dns_zone.id ]
-}
-
-#############################
-# (Manually Deployed) Services
-#############################
-# Logic Apps, Azure Functions, and Azure Cognitive Search will be deployed manually.
-# They should use the "services" subnet: module.vnet.subnet_ids[var.services_subnet_name].
+# The module for OpenAI private endpoint is commented out due to GroupId issues.
+# module "openai_private_endpoint" {
+#   source                         = "./modules/private_endpoint"
+#   name                           = "pe-${module.openai.name}"
+#   location                       = var.location
+#   resource_group_name            = azurerm_resource_group.rg.name
+#   subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
+#   tags                           = var.tags
+#   private_connection_resource_id = module.openai.id
+#   is_manual_connection           = false
+#   subresource_name               = "openai"
+#   private_dns_zone_group_name    = "OpenAiPrivateDnsZoneGroup"
+#   private_dns_zone_group_ids     = [ module.openai_private_dns_zone.id ]
+# }

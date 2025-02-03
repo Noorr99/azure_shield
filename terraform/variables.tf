@@ -1,6 +1,3 @@
-///////////////////////////////
-// General Resource Group & Location
-///////////////////////////////
 variable "resource_group_name" {
   description = "Name of the dedicated resource group."
   type        = string
@@ -8,23 +5,20 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  description = "Azure region for all resources. (e.g., northeurope)"
+  description = "Azure region for all resources. (e.g., eastus, northeurope)"
   type        = string
-  default     = "northeurope"
+  default     = "eastus"   # For OpenAI, eastus is a supported region.
 }
 
 variable "tags" {
   description = "Tags to apply to all resources."
   type        = map(string)
-  default = {
+  default     = {
     environment = "sheildnoor"
     project     = "sheildnoor"
   }
 }
 
-///////////////////////////////
-// Virtual Network & Subnets
-///////////////////////////////
 variable "vnet_name" {
   description = "Name of the virtual network."
   type        = string
@@ -61,19 +55,12 @@ variable "pe_subnet_prefix" {
   default     = ["10.0.2.0/24"]
 }
 
-///////////////////////////////
-// Log Analytics Workspace (for NSG diagnostics, etc.)
-///////////////////////////////
 variable "log_analytics_workspace_id" {
   description = "Resource ID of the Log Analytics workspace."
   type        = string
-  # Note: Replace the below default with your actual workspace resource id if available.
-  default     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sheildnoor/providers/Microsoft.OperationalInsights/workspaces/sheildnoor-law"
+  default     = "/subscriptions/<your-subscription-id>/resourceGroups/<rg-name>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>"
 }
 
-///////////////////////////////
-// NSG Variables for Subnets
-///////////////////////////////
 variable "services_nsg_name" {
   description = "Name of the NSG for the services subnet."
   type        = string
@@ -98,13 +85,9 @@ variable "pe_nsg_rules" {
   default     = []
 }
 
-///////////////////////////////
-// Azure Storage Account Variables
-///////////////////////////////
 variable "storage_account_name" {
-  description = "Name of the storage account."
+  description = "Name of the storage account (must be all lowercase and globally unique)."
   type        = string
-  # Storage account names must be globally unique and lower-case.
   default     = "stsheildnoor"
 }
 
@@ -138,9 +121,6 @@ variable "storage_ip_rules" {
   default     = []
 }
 
-///////////////////////////////
-// Azure OpenAI Variables
-///////////////////////////////
 variable "openai_name" {
   description = "Name of the Azure OpenAI service."
   type        = string
