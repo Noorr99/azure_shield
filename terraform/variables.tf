@@ -1,11 +1,41 @@
-// Resource & General Settings
+///////////////////////////////
+// Backend Configuration
+///////////////////////////////
+variable "backend_resource_group" {
+  description = "Resource group name for storing Terraform state."
+  type        = string
+}
+
+variable "backend_storage_account" {
+  description = "Storage account name for the Terraform state backend."
+  type        = string
+}
+
+variable "backend_container" {
+  description = "Container name for the Terraform state backend."
+  type        = string
+}
+
+variable "backend_key" {
+  description = "The key for the Terraform state file."
+  type        = string
+}
+
+variable "backend_subscription_id" {
+  description = "Subscription ID for the Terraform state backend."
+  type        = string
+}
+
+///////////////////////////////
+// General Resource Group & Location
+///////////////////////////////
 variable "resource_group_name" {
-  description = "Name of the resource group for all resources."
+  description = "Name of the dedicated resource group."
   type        = string
 }
 
 variable "location" {
-  description = "Azure region (e.g., northeurope)."
+  description = "Azure region for all resources. (e.g., northeurope)"
   type        = string
 }
 
@@ -14,101 +44,75 @@ variable "tags" {
   type        = map(string)
 }
 
-// Virtual Network Settings
+///////////////////////////////
+// Virtual Network & Subnets
+///////////////////////////////
 variable "vnet_name" {
-  description = "Name of the Virtual Network."
+  description = "Name of the virtual network."
   type        = string
 }
 
 variable "vnet_address_space" {
-  description = "Address space for the Virtual Network."
+  description = "Address space for the virtual network."
   type        = list(string)
 }
 
-// Subnet Settings
 variable "services_subnet_name" {
-  description = "Name of the subnet for services (Functions, Logic Apps)."
+  description = "Name of the subnet for services (Logic Apps, Azure Functions, etc.)."
   type        = string
 }
 
-variable "services_subnet_address_prefixes" {
-  description = "Address prefixes for the services subnet."
+variable "services_subnet_prefix" {
+  description = "Address prefix(es) for the services subnet."
   type        = list(string)
 }
 
-variable "ai_subnet_name" {
-  description = "Name of the subnet for AI/private endpoints."
+variable "pe_subnet_name" {
+  description = "Name of the subnet for private endpoints."
   type        = string
 }
 
-variable "ai_subnet_address_prefixes" {
-  description = "Address prefixes for the AI subnet."
+variable "pe_subnet_prefix" {
+  description = "Address prefix(es) for the private endpoints subnet."
   type        = list(string)
 }
 
-// NSG Settings
-variable "nsg_services_name" {
+///////////////////////////////
+// Log Analytics Workspace (for NSG diagnostics, etc.)
+///////////////////////////////
+variable "log_analytics_workspace_id" {
+  description = "Resource ID of the Log Analytics workspace."
+  type        = string
+}
+
+///////////////////////////////
+// NSG Variables for Subnets
+///////////////////////////////
+variable "services_nsg_name" {
   description = "Name of the NSG for the services subnet."
   type        = string
 }
 
-variable "nsg_services_rules" {
-  description = "Security rules for the NSG of the services subnet."
-  type        = any
+variable "services_nsg_rules" {
+  description = "Security rules for the services subnet NSG."
+  type        = list(any)
   default     = []
 }
 
-variable "nsg_ai_name" {
-  description = "Name of the NSG for the AI subnet."
+variable "pe_nsg_name" {
+  description = "Name of the NSG for the private endpoints subnet."
   type        = string
 }
 
-variable "nsg_ai_rules" {
-  description = "Security rules for the NSG of the AI subnet."
-  type        = any
+variable "pe_nsg_rules" {
+  description = "Security rules for the private endpoints subnet NSG."
+  type        = list(any)
   default     = []
 }
 
-variable "log_analytics_workspace_id" {
-  description = "Resource ID of the Log Analytics Workspace for NSG diagnostics."
-  type        = string
-}
-
-// Azure Functions Variables
-/*
-variable "functions_name" {
-  description = "Name of the Azure Functions app. Must be 3-24 characters, lowercase letters and numbers only."
-  type        = string
-}
-
-variable "functions_sku" {
-  description = "SKU for the Azure Functions app (e.g., P1v2 or Y1)."
-  type        = string
-}
-
-variable "app_service_plan_tier" {
-  description = "Tier for the Service Plan (e.g., Dynamic or PremiumV2)."
-  type        = string
-}
-
-variable "app_service_plan_size" {
-  description = "Size for the Service Plan (e.g., Y1 for consumption, P1v2 for premium)."
-  type        = string
-}
-
-variable "function_app_version" {
-  description = "Version for the Function App (e.g., ~3 or ~4)."
-  type        = string
-}
-
-variable "functions_worker_runtime" {
-  description = "Worker runtime for the Functions app (e.g., dotnet, python, node)."
-  type        = string
-}
-
-*/
-
-// Storage Account Variables
+///////////////////////////////
+// Azure Storage Account Variables
+///////////////////////////////
 variable "storage_account_name" {
   description = "Name of the storage account."
   type        = string
@@ -121,68 +125,56 @@ variable "storage_account_kind" {
 }
 
 variable "storage_account_tier" {
-  description = "Tier of the storage account (e.g., Standard or Premium)."
+  description = "Account tier for the storage account (e.g., Standard or Premium)."
   type        = string
+  default     = "Standard"
 }
 
-variable "storage_account_replication_type" {
-  description = "Replication type for the storage account (e.g., LRS, GRS, etc.)."
+variable "storage_replication_type" {
+  description = "Replication type for the storage account (e.g., LRS, ZRS, etc.)."
   type        = string
+  default     = "LRS"
 }
 
-variable "is_hns_enabled" {
-  description = "Whether hierarchical namespace is enabled."
+variable "storage_is_hns_enabled" {
+  description = "Enable hierarchical namespace on the storage account?"
   type        = bool
   default     = false
 }
 
-variable "default_action" {
-  description = "Default network action for storage (Allow or Deny)."
-  type        = string
-  default     = "Allow"
-}
-
-variable "ip_rules" {
-  description = "List of IP rules for the storage account."
+variable "storage_ip_rules" {
+  description = "IP rules for the storage account."
   type        = list(string)
   default     = []
 }
 
-variable "virtual_network_subnet_ids" {
-  description = "List of subnet resource IDs for virtual network rules on the storage account."
-  type        = list(string)
-  default     = []
-}
-
-// Azure Cognitive Search Variables
-variable "search_service_name" {
-  description = "Name of the Azure Cognitive Search service."
-  type        = string
-}
-
-variable "search_sku" {
-  description = "SKU for the Azure Cognitive Search service (e.g., standard)."
-  type        = string
-}
-
+///////////////////////////////
 // Azure OpenAI Variables
+///////////////////////////////
 variable "openai_name" {
   description = "Name of the Azure OpenAI service."
   type        = string
 }
 
+variable "openai_sku" {
+  description = "SKU name for the Azure OpenAI service."
+  type        = string
+  default     = "S0"
+}
 
-variable "logic_apps_name" {
-  description = "Name of the Logic Apps Standard app."
+variable "openai_custom_subdomain_name" {
+  description = "Custom subdomain name for the Azure OpenAI service."
   type        = string
 }
 
-variable "logic_apps_sku" {
-  description = "SKU for the Logic Apps Standard app (e.g., Standard)."
-  type        = string
-}
-
-variable "logic_apps_storage_account_name" {
-  description = "Name of the storage account used by the Logic Apps Standard app."
-  type        = string
+variable "openai_deployments" {
+  description = "List of deployments for the Azure OpenAI service."
+  type = list(object({
+    name = string
+    model = object({
+      name    = string
+      version = string
+    })
+  }))
+  default = []
 }

@@ -1,3 +1,4 @@
+
 terraform {
   required_providers {
     azurerm = {
@@ -5,6 +6,7 @@ terraform {
       version = "3.50"
     }
   }
+  # Backend configuration – adjust these variables (or values) as needed.
 
   backend "azurerm" {
     resource_group_name  = "rg-terraform-storage"
@@ -12,6 +14,7 @@ terraform {
     container_name       = "tfstatesheilddev"
     key                  = "terraform.tfstate"
   }
+
 }
 
 provider "azurerm" {
@@ -20,213 +23,191 @@ provider "azurerm" {
 
 data "azurerm_client_config" "current" {}
 
-###############################
-# Single Resource Group
-###############################
-
-resource "azurerm_resource_group" "main" {
-  name     = var.resource_group_name
-  location = var.location
-  tags     = var.tags
-}
-
-###############################
-# Virtual Network & Subnets
-###############################
+#############################
+# Virtual Network & Subnets #
+#############################
 
 module "vnet" {
   source              = "./modules/virtual_network"
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = var.resource_group_name
   location            = var.location
   vnet_name           = var.vnet_name
   address_space       = var.vnet_address_space
-  tags                = var.tags
 
+  # Two subnets: one for services and one for private endpoints.
   subnets = [
     {
       name                                          = var.services_subnet_name
-      address_prefixes                              = var.services_subnet_address_prefixes
+      address_prefixes                              = var.services_subnet_prefix
       private_endpoint_network_policies_enabled     = true
       private_link_service_network_policies_enabled = false
     },
     {
-      name                                          = var.ai_subnet_name
-      address_prefixes                              = var.ai_subnet_address_prefixes
+      name                                          = var.pe_subnet_name
+      address_prefixes                              = var.pe_subnet_prefix
+      # For private endpoints, policies must be disabled.
       private_endpoint_network_policies_enabled     = false
       private_link_service_network_policies_enabled = true
     }
   ]
 }
 
-###############################
-# Network Security Groups (NSGs)
-###############################
+#############################
+# NSG Modules and Associations
+#############################
 
-module "nsg_services" {
-  source                     = "./modules/network_security_group"
-  name                       = var.nsg_services_name
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = var.location
-  security_rules             = var.nsg_services_rules
+module "services_nsg" {
+  source              = "./modules/nsg"
+  name                = var.services_nsg_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  security_rules      = var.services_nsg_rules
+  tags                = var.tags
   log_analytics_workspace_id = var.log_analytics_workspace_id
-  tags                       = var.tags
 }
 
-resource "azurerm_subnet_network_security_group_association" "services" {
+module "pe_nsg" {
+  source              = "./modules/nsg"
+  name                = var.pe_nsg_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  security_rules      = var.pe_nsg_rules
+  tags                = var.tags
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+}
+
+resource "azurerm_subnet_network_security_group_association" "services_assoc" {
   subnet_id                 = module.vnet.subnet_ids[var.services_subnet_name]
-  network_security_group_id = module.nsg_services.id
+  network_security_group_id = module.services_nsg.id
 }
 
-module "nsg_ai" {
-  source                     = "./modules/network_security_group"
-  name                       = var.nsg_ai_name
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = var.location
-  security_rules             = var.nsg_ai_rules
-  log_analytics_workspace_id = var.log_analytics_workspace_id
-  tags                       = var.tags
+resource "azurerm_subnet_network_security_group_association" "pe_assoc" {
+  subnet_id                 = module.vnet.subnet_ids[var.pe_subnet_name]
+  network_security_group_id = module.pe_nsg.id
 }
 
-resource "azurerm_subnet_network_security_group_association" "ai" {
-  subnet_id                 = module.vnet.subnet_ids[var.ai_subnet_name]
-  network_security_group_id = module.nsg_ai.id
+#############################
+# Storage Account & Endpoints
+#############################
+
+module "storage_account" {
+  source              = "./modules/storage_account"
+  resource_group_name = var.resource_group_name
+  name                = var.storage_account_name
+  location            = var.location
+  account_kind        = var.storage_account_kind
+  account_tier        = var.storage_account_tier
+  replication_type    = var.storage_replication_type
+  is_hns_enabled      = var.storage_is_hns_enabled
+  tags                = var.tags
+
+  # To enforce no public access, we set the default action to Deny.
+  default_action             = "Deny"
+  ip_rules                   = var.storage_ip_rules
+  virtual_network_subnet_ids = [ module.vnet.subnet_ids[var.pe_subnet_name] ]
 }
 
-###############################
-# Private DNS Zones
-###############################
-
-module "dns_blob" {
+module "storage_blob_private_dns_zone" {
   source              = "./modules/private_dns_zone"
   name                = "privatelink.blob.core.windows.net"
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = var.resource_group_name
   virtual_networks_to_link = {
-    "${var.vnet_name}" = {
-      virtual_network_id = module.vnet.vnet_id
+    module.vnet.vnet_name = {
+      subscription_id     = data.azurerm_client_config.current.subscription_id
+      resource_group_name = var.resource_group_name
     }
   }
   tags = var.tags
 }
 
-module "dns_table" {
+module "storage_table_private_dns_zone" {
   source              = "./modules/private_dns_zone"
   name                = "privatelink.table.core.windows.net"
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = var.resource_group_name
   virtual_networks_to_link = {
-    "${var.vnet_name}" = {
-      virtual_network_id = module.vnet.vnet_id
+    module.vnet.vnet_name = {
+      subscription_id     = data.azurerm_client_config.current.subscription_id
+      resource_group_name = var.resource_group_name
     }
   }
   tags = var.tags
 }
 
-###############################
-# Services
-###############################
-
-/*
-# Azure Functions (Linux Function App in a consumption or dynamic plan)
-module "functions" {
-  source                 = "./modules/azure_functions"
-  functions_name         = var.functions_name
-  resource_group_name    = azurerm_resource_group.main.name
-  location               = var.location
-  app_service_plan_tier  = var.app_service_plan_tier
-  app_service_plan_size  = var.app_service_plan_size
-  function_app_version   = var.function_app_version
-  functions_worker_runtime = var.functions_worker_runtime
-  tags                   = var.tags
-}
-*/
-
-
-# Logic Apps Standard (VNet integrated with Managed Identity)
-module "logic_apps" {
-  source                         = "./modules/logic_apps"
-  logic_apps_name                = var.logic_apps_name
-  sku                            = var.logic_apps_sku
-  resource_group_name            = azurerm_resource_group.main.name
-  location                       = var.location
-  subnet_id                      = module.vnet.subnet_ids[var.services_subnet_name]
-  storage_account_name           = var.logic_apps_storage_account_name
-  storage_account_access_key     = module.storage.primary_access_key
-  tags                           = var.tags
-}
-
-# Storage Account
-module "storage" {
-  source                     = "./modules/storage_account"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = var.location
-  name                       = var.storage_account_name
-  account_kind               = var.storage_account_kind
-  account_tier               = var.storage_account_tier
-  replication_type           = var.storage_account_replication_type
-  is_hns_enabled             = var.is_hns_enabled
-  default_action             = var.default_action
-  ip_rules                   = var.ip_rules
-  virtual_network_subnet_ids = var.virtual_network_subnet_ids
-  tags                       = var.tags
-}
-
-# Azure Cognitive Search
-module "search" {
-  source              = "./modules/azure_search"
-  search_service_name = var.search_service_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  sku                 = var.search_sku
-  tags                = var.tags
-}
-
-# Azure OpenAI
-module "openai" {
-  source              = "./modules/azure_openai"
-  openai_name         = var.openai_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  tags                = var.tags
-}
-
-
-
-/*
-# (Optional) Key Vault with Private Endpoint
-module "key_vault" {
-  source              = "./modules/key_vault"
-  name                = var.key_vault_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  tenant_id           = var.tenant_id
-  sku_name            = var.key_vault_sku
-  tags                = var.tags
-
-  enabled_for_deployment          = var.key_vault_enabled_for_deployment
-  enabled_for_disk_encryption     = var.key_vault_enabled_for_disk_encryption
-  enabled_for_template_deployment = var.key_vault_enabled_for_template_deployment
-  enable_rbac_authorization       = var.key_vault_enable_rbac_authorization
-  purge_protection_enabled        = var.key_vault_purge_protection_enabled
-  soft_delete_retention_days      = var.key_vault_soft_delete_retention_days
-  public_network_access_enabled   = false
-
-  bypass         = var.key_vault_bypass
-  default_action = var.key_vault_default_action
-  ip_rules       = var.key_vault_ip_rules
-  virtual_network_subnet_ids = []
-}
-
-module "key_vault_private_endpoint" {
+module "storage_blob_private_endpoint" {
   source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.key_vault.name}"
+  name                           = "pe-${module.storage_account.name}-blob"
   location                       = var.location
-  resource_group_name            = azurerm_resource_group.main.name
-  subnet_id                      = module.vnet.subnet_ids[var.ai_subnet_name]
+  resource_group_name            = var.resource_group_name
+  subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
   tags                           = var.tags
-  private_connection_resource_id = module.key_vault.id
+  private_connection_resource_id = module.storage_account.id
   is_manual_connection           = false
-  subresource_name               = "vault"
-  private_dns_zone_group_name    = "KeyVaultPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_vault.id]
+  subresource_name               = "blob"
+  private_dns_zone_group_name    = "StorageBlobPrivateDnsZoneGroup"
+  private_dns_zone_group_ids     = [ module.storage_blob_private_dns_zone.id ]
 }
 
-*/
+module "storage_table_private_endpoint" {
+  source                         = "./modules/private_endpoint"
+  name                           = "pe-${module.storage_account.name}-table"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
+  tags                           = var.tags
+  private_connection_resource_id = module.storage_account.id
+  is_manual_connection           = false
+  subresource_name               = "table"
+  private_dns_zone_group_name    = "StorageTablePrivateDnsZoneGroup"
+  private_dns_zone_group_ids     = [ module.storage_table_private_dns_zone.id ]
+}
+
+#############################
+# Azure OpenAI & Endpoints
+#############################
+
+module "openai" {
+  source              = "./modules/openai"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  name                = var.openai_name
+  sku_name            = var.openai_sku
+  tags                = var.tags
+
+  custom_subdomain_name         = var.openai_custom_subdomain_name
+  public_network_access_enabled = false
+  deployments                   = var.openai_deployments
+  log_analytics_workspace_id    = var.log_analytics_workspace_id
+}
+
+module "openai_private_dns_zone" {
+  source              = "./modules/private_dns_zone"
+  name                = "privatelink.openai.azure.com"
+  resource_group_name = var.resource_group_name
+  virtual_networks_to_link = {
+    module.vnet.vnet_name = {
+      subscription_id     = data.azurerm_client_config.current.subscription_id
+      resource_group_name = var.resource_group_name
+    }
+  }
+  tags = var.tags
+}
+
+module "openai_private_endpoint" {
+  source                         = "./modules/private_endpoint"
+  name                           = "pe-${module.openai.name}"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
+  tags                           = var.tags
+  private_connection_resource_id = module.openai.id
+  is_manual_connection           = false
+  subresource_name               = "openai"  # Assumes this is the correct subresource name
+  private_dns_zone_group_name    = "OpenAiPrivateDnsZoneGroup"
+  private_dns_zone_group_ids     = [ module.openai_private_dns_zone.id ]
+}
+
+#############################
+# (Manually Deployed) Services
+#############################
+# Logic Apps, Azure Functions, and Azure Cognitive Search will be deployed manually.
+# They are expected to use the "services" subnet (module.vnet.subnet_ids[var.services_subnet_name]).
