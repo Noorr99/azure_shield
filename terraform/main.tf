@@ -7,7 +7,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      # IMPORTANT: Must be >= 3.64.0 to support azurerm_openai_account & new logic app
+      # Must be at least 3.64.0 to support the new resource types
       version = ">= 3.64.0"
     }
   }
@@ -145,33 +145,28 @@ resource "azurerm_private_dns_zone" "main_zones" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "main_zone_links" {
-  for_each                                 = azurerm_private_dns_zone.main_zones
-  name                                     = "${each.value.name}-link"
-  resource_group_name                      = azurerm_resource_group.rg_networking.name
-  private_dns_zone_name                    = each.value.name
-  virtual_network_id                       = azurerm_virtual_network.main_vnet.id
-  registration_enabled                     = false
+  for_each              = azurerm_private_dns_zone.main_zones
+  name                  = "${each.value}-link"
+  resource_group_name   = azurerm_resource_group.rg_networking.name
+  private_dns_zone_name = each.value
+  virtual_network_id    = azurerm_virtual_network.main_vnet.id
+  registration_enabled  = false
 }
 
 ###############################################################################
-# Azure Key Vault (with optional private endpoint)
+# Azure Key Vault (with private endpoint)
 ###############################################################################
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "main_kv" {
-  name                = "${var.prefix}-kv"
-  location            = azurerm_resource_group.rg_services.location
-  resource_group_name = azurerm_resource_group.rg_services.name
-  sku_name            = "standard"
-
-  # No longer needed: soft_delete_enabled (deprecated/removed)
-  # Just keep purge_protection_enabled
-  purge_protection_enabled       = true
-  public_network_access_enabled  = false
-
-  # Soft delete is always on by default in new KV
-  tenant_id = data.azurerm_client_config.current.tenant_id
-  tags      = var.tags
+  name                       = "${var.prefix}-kv"
+  location                   = azurerm_resource_group.rg_services.location
+  resource_group_name        = azurerm_resource_group.rg_services.name
+  sku_name                   = "standard"
+  purge_protection_enabled   = true
+  public_network_access_enabled = false
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  tags                       = var.tags
 }
 
 resource "azurerm_private_endpoint" "kv_pe" {
@@ -184,10 +179,8 @@ resource "azurerm_private_endpoint" "kv_pe" {
     name                           = "kv-priv-connection"
     private_connection_resource_id = azurerm_key_vault.main_kv.id
     subresource_names              = ["vault"]
-    # If needed in older provider versions:
-    # is_manual_connection         = false
+    is_manual_connection           = false
   }
-
   tags = var.tags
 }
 
@@ -200,7 +193,7 @@ resource "azurerm_private_dns_a_record" "kv_private_dns" {
 }
 
 ###############################################################################
-# Azure Storage (with blob, table + private endpoint)
+# Azure Storage (with blob and table private endpoints)
 ###############################################################################
 resource "azurerm_storage_account" "main_sa" {
   name                     = "${var.prefix}sa"
@@ -209,14 +202,12 @@ resource "azurerm_storage_account" "main_sa" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
-  # Valid in azurerm >= 2.66
-  allow_blob_public_access = false
-
-  enable_https_traffic_only = true
-  is_hns_enabled            = false
-  min_tls_version           = "TLS1_2"
+  allow_blob_public_access      = false
+  enable_https_traffic_only     = true
+  is_hns_enabled                = false
+  min_tls_version               = "TLS1_2"
   public_network_access_enabled = false
-  tags = var.tags
+  tags                        = var.tags
 }
 
 resource "azurerm_private_endpoint" "storage_blob_pe" {
@@ -229,8 +220,8 @@ resource "azurerm_private_endpoint" "storage_blob_pe" {
     name                           = "blob-priv-connection"
     private_connection_resource_id = azurerm_storage_account.main_sa.id
     subresource_names              = ["blob"]
+    is_manual_connection           = false
   }
-
   tags = var.tags
 }
 
@@ -252,8 +243,8 @@ resource "azurerm_private_endpoint" "storage_table_pe" {
     name                           = "table-priv-connection"
     private_connection_resource_id = azurerm_storage_account.main_sa.id
     subresource_names              = ["table"]
+    is_manual_connection           = false
   }
-
   tags = var.tags
 }
 
@@ -266,7 +257,7 @@ resource "azurerm_private_dns_a_record" "storage_table_a_record" {
 }
 
 ###############################################################################
-# Azure Cognitive Search (private endpoint)
+# Azure Cognitive Search (with private endpoint)
 ###############################################################################
 resource "azurerm_search_service" "main_search" {
   name                = "${var.prefix}-search"
@@ -275,9 +266,8 @@ resource "azurerm_search_service" "main_search" {
   sku                 = "standard"
   replica_count       = 1
   partition_count     = 1
-
   public_network_access_enabled = false
-  tags                          = var.tags
+  tags                = var.tags
 }
 
 resource "azurerm_private_endpoint" "search_pe" {
@@ -290,8 +280,8 @@ resource "azurerm_private_endpoint" "search_pe" {
     name                           = "search-priv-connection"
     private_connection_resource_id = azurerm_search_service.main_search.id
     subresource_names              = ["searchService"]
+    is_manual_connection           = false
   }
-
   tags = var.tags
 }
 
@@ -304,55 +294,55 @@ resource "azurerm_private_dns_a_record" "search_a_record" {
 }
 
 ###############################################################################
-# Azure OpenAI (private endpoint) - New in provider >= 3.64
+# (Azure OpenAI section removed due to resource type support issues)
 ###############################################################################
-resource "azurerm_openai_account" "main_openai" {
-  name                = "${var.prefix}-openai"
-  location            = azurerm_resource_group.rg_services.location
-  resource_group_name = azurerm_resource_group.rg_services.name
-
-  sku {
-    name     = "s0"
-    capacity = 1
-  }
-
-  public_network_access_enabled = false
-  tags                          = var.tags
-}
-
-resource "azurerm_private_endpoint" "openai_pe" {
-  name                = "${var.prefix}-pe-openai"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg_networking.name
-  subnet_id           = azurerm_subnet.subnet_ai.id
-
-  private_service_connection {
-    name                           = "openai-priv-connection"
-    private_connection_resource_id = azurerm_openai_account.main_openai.id
-    subresource_names              = ["OpenAi"]
-  }
-
-  tags = var.tags
-}
-
-resource "azurerm_private_dns_a_record" "openai_a_record" {
-  name                = azurerm_openai_account.main_openai.name
-  zone_name           = azurerm_private_dns_zone.main_zones["privatelink.openai.azure.com"].name
-  resource_group_name = azurerm_resource_group.rg_networking.name
-  records             = [azurerm_private_endpoint.openai_pe.private_service_connection[0].private_ip_address]
-  ttl                 = 300
-}
+# Uncomment and update the following blocks if your provider supports azurerm_openai_account
+# resource "azurerm_openai_account" "main_openai" {
+#   name                = "${var.prefix}-openai"
+#   location            = azurerm_resource_group.rg_services.location
+#   resource_group_name = azurerm_resource_group.rg_services.name
+#
+#   sku {
+#     name     = "s0"
+#     capacity = 1
+#   }
+#
+#   public_network_access_enabled = false
+#   tags                          = var.tags
+# }
+#
+# resource "azurerm_private_endpoint" "openai_pe" {
+#   name                = "${var.prefix}-pe-openai"
+#   location            = var.location
+#   resource_group_name = azurerm_resource_group.rg_networking.name
+#   subnet_id           = azurerm_subnet.subnet_ai.id
+#
+#   private_service_connection {
+#     name                           = "openai-priv-connection"
+#     private_connection_resource_id = azurerm_openai_account.main_openai.id
+#     subresource_names              = ["OpenAi"]
+#     is_manual_connection           = false
+#   }
+#   tags = var.tags
+# }
+#
+# resource "azurerm_private_dns_a_record" "openai_a_record" {
+#   name                = azurerm_openai_account.main_openai.name
+#   zone_name           = azurerm_private_dns_zone.main_zones["privatelink.openai.azure.com"].name
+#   resource_group_name = azurerm_resource_group.rg_networking.name
+#   records             = [azurerm_private_endpoint.openai_pe.private_service_connection[0].private_ip_address]
+#   ttl                 = 300
+# }
 
 ###############################################################################
 # Azure Functions (Premium plan + VNet Integration)
 ###############################################################################
-# Must set os_type="Linux" (capital L)
 resource "azurerm_service_plan" "func_plan" {
   name                = "${var.prefix}-func-premium-plan"
   location            = azurerm_resource_group.rg_services.location
   resource_group_name = azurerm_resource_group.rg_services.name
   os_type             = "Linux"
-  sku_name            = "EP1" # Premium plan
+  sku_name            = "EP1"  # Premium plan
   tags                = var.tags
 }
 
@@ -377,7 +367,6 @@ resource "azurerm_linux_function_app" "main_function" {
 
   site_config {
     vnet_route_all_enabled = true
-    # Additional config if needed
   }
 
   tags = var.tags
@@ -393,8 +382,8 @@ resource "azurerm_private_endpoint" "function_pe" {
     name                           = "function-priv-connection"
     private_connection_resource_id = azurerm_linux_function_app.main_function.id
     subresource_names              = ["sites"]
+    is_manual_connection           = false
   }
-
   tags = var.tags
 }
 
@@ -407,15 +396,15 @@ resource "azurerm_private_dns_a_record" "function_a_record" {
 }
 
 ###############################################################################
-# Logic Apps (Standard) - Updated for Provider >= 3.64
+# Logic Apps (Standard) - VNet Integration
 ###############################################################################
-# 1) Create an App Service Plan that supports "WorkflowStandard" SKU
-resource "azurerm_app_service_plan" "logicapp_plan" {
+# Create a Service Plan for Logic Apps using the new resource type
+resource "azurerm_service_plan" "logicapp_plan" {
   name                = "${var.prefix}-logicapp-plan"
   location            = azurerm_resource_group.rg_services.location
   resource_group_name = azurerm_resource_group.rg_services.name
-  kind                = "functionapp"  # for Linux
-  reserved            = true           # needed for Linux
+  os_type             = "Linux"
+  reserved            = true  # required for Linux
   sku {
     tier = "WorkflowStandard"
     size = "WS1"
@@ -428,8 +417,7 @@ resource "azurerm_logic_app_standard" "main_logicapp" {
   location            = azurerm_resource_group.rg_services.location
   resource_group_name = azurerm_resource_group.rg_services.name
 
-  # Must reference an App Service Plan that supports WS SKU
-  app_service_plan_id        = azurerm_app_service_plan.logicapp_plan.id
+  app_service_plan_id        = azurerm_service_plan.logicapp_plan.id
   storage_account_name       = azurerm_storage_account.main_sa.name
   storage_account_access_key = azurerm_storage_account.main_sa.primary_access_key
 
@@ -442,7 +430,6 @@ resource "azurerm_logic_app_standard" "main_logicapp" {
     type = "SystemAssigned"
   }
 
-  # If restricting inbound traffic, use ip_restriction
   ip_restriction {
     name           = "Allow-Internal"
     action         = "Allow"
@@ -461,9 +448,9 @@ resource "azurerm_private_endpoint" "logicapp_pe" {
   private_service_connection {
     name                           = "logicapp-priv-connection"
     private_connection_resource_id = azurerm_logic_app_standard.main_logicapp.id
-    subresource_names              = ["sites"] 
+    subresource_names              = ["sites"]
+    is_manual_connection           = false
   }
-
   tags = var.tags
 }
 
@@ -476,39 +463,39 @@ resource "azurerm_private_dns_a_record" "logicapp_a_record" {
 }
 
 ###############################################################################
-# Example Azure Policy - Adjusted for Data & Resource Blocks
+# (Optional) Policy Assignment Blocks
 ###############################################################################
-# 1) Allowed Locations
-data "azurerm_policy_definition" "allowed_locations" {
-  # Only specify 'name' or 'display_name'. Using built-in policy by ID:
-  name = "c2f7d0aa-6f86-4ac9-90a6-27d3d15163e6"
-}
+# The following blocks are commented out because your current provider
+# reports that it does not support the resource type. Uncomment them
+# after verifying that your provider version supports policy assignment.
 
-resource "azurerm_policy_assignment" "allowed_locations_assignment" {
-  name                 = "${var.prefix}-allowed-locations"
-  scope                = azurerm_resource_group.rg_services.id
-  policy_definition_id = data.azurerm_policy_definition.allowed_locations.id
-  location             = var.location
-
-  parameters = jsonencode({
-    listOfAllowedLocations = {
-      value = ["northeurope"]
-    }
-  })
-}
-
-# 2) Require Private Endpoints for Storage
-data "azurerm_policy_definition" "require_private_endpoints_for_storage" {
-  # Built-in policy ID
-  name = "c179a8cc-0987-4d6f-a7b4-2d51aa49e8d7"
-}
-
-resource "azurerm_policy_assignment" "require_private_endpoints_for_storage_assignment" {
-  name                 = "${var.prefix}-require-pe-storage"
-  scope                = azurerm_resource_group.rg_services.id
-  policy_definition_id = data.azurerm_policy_definition.require_private_endpoints_for_storage.id
-  location             = var.location
-}
+# data "azurerm_policy_definition" "allowed_locations" {
+#   name = "c2f7d0aa-6f86-4ac9-90a6-27d3d15163e6"
+# }
+#
+# resource "azurerm_policy_assignment" "allowed_locations_assignment" {
+#   name                 = "${var.prefix}-allowed-locations"
+#   scope                = azurerm_resource_group.rg_services.id
+#   policy_definition_id = data.azurerm_policy_definition.allowed_locations.id
+#   location             = var.location
+#
+#   parameters = jsonencode({
+#     listOfAllowedLocations = {
+#       value = ["northeurope"]
+#     }
+#   })
+# }
+#
+# data "azurerm_policy_definition" "require_private_endpoints_for_storage" {
+#   name = "c179a8cc-0987-4d6f-a7b4-2d51aa49e8d7"
+# }
+#
+# resource "azurerm_policy_assignment" "require_private_endpoints_for_storage_assignment" {
+#   name                 = "${var.prefix}-require-pe-storage"
+#   scope                = azurerm_resource_group.rg_services.id
+#   policy_definition_id = data.azurerm_policy_definition.require_private_endpoints_for_storage.id
+#   location             = var.location
+# }
 
 ###############################################################################
 # Example RBAC Role Assignments for Managed Identities
@@ -517,7 +504,6 @@ resource "azurerm_role_assignment" "function_kv_secrets_user" {
   scope                = azurerm_key_vault.main_kv.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_function_app.main_function.identity[0].principal_id
-
   skip_service_principal_aad_check = true
 }
 
@@ -525,6 +511,5 @@ resource "azurerm_role_assignment" "logicapp_blob_reader" {
   scope                = azurerm_storage_account.main_sa.id
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_logic_app_standard.main_logicapp.identity[0].principal_id
-
   skip_service_principal_aad_check = true
 }
