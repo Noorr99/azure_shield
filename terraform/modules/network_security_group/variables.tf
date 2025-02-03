@@ -24,7 +24,10 @@ variable "tags" {
   default     = {}
 }
 
+/*
 variable "log_analytics_workspace_id" {
   description = "Specifies the log analytics workspace resource id"
   type        = string
 }
+*/
+

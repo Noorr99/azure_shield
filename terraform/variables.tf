@@ -163,8 +163,4 @@ variable "openai_deployments" {
 ///////////////////////////////
 // Dummy Diagnostic Variable
 ///////////////////////////////
-variable "log_analytics_workspace_id" {
-  description = "Not used; dummy value to satisfy module requirements."
-  type        = string
-  default     = ""
-}
+

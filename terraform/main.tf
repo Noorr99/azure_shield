@@ -64,7 +64,7 @@ module "services_nsg" {
   location                   = var.location
   security_rules             = var.services_nsg_rules
   tags                       = var.tags
-  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value passed from variable.
+//  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value passed from variable.
 }
 
 module "pe_nsg" {
@@ -74,7 +74,7 @@ module "pe_nsg" {
   location                   = var.location
   security_rules             = var.pe_nsg_rules
   tags                       = var.tags
-  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value.
+//  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value.
 }
 
 resource "azurerm_subnet_network_security_group_association" "services_assoc" {
@@ -174,7 +174,7 @@ module "openai" {
   custom_subdomain_name      = var.openai_custom_subdomain_name
   public_network_access_enabled = false
   deployments                   = var.openai_deployments
-  log_analytics_workspace_id    = var.log_analytics_workspace_id  # Dummy value.
+//  log_analytics_workspace_id    = var.log_analytics_workspace_id  # Dummy value.
 }
 
 module "openai_private_dns_zone" {

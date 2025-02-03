@@ -48,7 +48,9 @@ variable "deployments" {
   default = [] 
 }
 
+/*
 variable "log_analytics_workspace_id" {
   description = "Specifies the resource id of the Azure Log Analytics workspace."
   type        = string
 }
+*/
