@@ -11,7 +11,6 @@ terraform {
     storage_account_name = "terraformstgaks99"
     container_name       = "tfstatesheilddev"
     key                  = "terraform.tfstate"
-//    subscription_id      = "00000000-0000-0000-0000-000000000000"
   }
 }
 
@@ -43,9 +42,7 @@ module "vnet" {
   address_space       = var.vnet_address_space
   tags                = var.tags
 
-  # Two subnets:
-  # 1. Services (for Functions and Logic Apps)
-  # 2. AI & private endpoints (for Storage, Cognitive Search, OpenAI, etc.)
+  # Subnets for services and AI/private endpoints
   subnets = [
     {
       name                                          = var.services_subnet_name
@@ -63,16 +60,17 @@ module "vnet" {
 }
 
 ###############################
-# NSG Associations
+# Network Security Groups (NSGs)
 ###############################
 
 module "nsg_services" {
-  source              = "./modules/network_security_group"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  nsg_name            = var.nsg_services_name
-  security_rules      = var.nsg_services_rules
-  tags                = var.tags
+  source                        = "./modules/network_security_group"
+  name                          = var.nsg_services_name
+  resource_group_name           = azurerm_resource_group.main.name
+  location                      = var.location
+  security_rules                = var.nsg_services_rules
+  log_analytics_workspace_id    = var.log_analytics_workspace_id
+  tags                          = var.tags
 }
 
 resource "azurerm_subnet_network_security_group_association" "services" {
@@ -81,12 +79,13 @@ resource "azurerm_subnet_network_security_group_association" "services" {
 }
 
 module "nsg_ai" {
-  source              = "./modules/network_security_group"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  nsg_name            = var.nsg_ai_name
-  security_rules      = var.nsg_ai_rules
-  tags                = var.tags
+  source                        = "./modules/network_security_group"
+  name                          = var.nsg_ai_name
+  resource_group_name           = azurerm_resource_group.main.name
+  location                      = var.location
+  security_rules                = var.nsg_ai_rules
+  log_analytics_workspace_id    = var.log_analytics_workspace_id
+  tags                          = var.tags
 }
 
 resource "azurerm_subnet_network_security_group_association" "ai" {
@@ -95,7 +94,7 @@ resource "azurerm_subnet_network_security_group_association" "ai" {
 }
 
 ###############################
-# Private DNS Zones (Existing Modules)
+# Private DNS Zones
 ###############################
 
 module "dns_blob" {
@@ -122,59 +121,11 @@ module "dns_table" {
   tags = var.tags
 }
 
-module "dns_search" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.search.windows.net"
-  resource_group_name = azurerm_resource_group.main.name
-  virtual_networks_to_link = {
-    (module.vnet.vnet_name) = {
-      virtual_network_id = module.vnet.vnet_id
-    }
-  }
-  tags = var.tags
-}
-
-module "dns_openai" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.openai.azure.com"
-  resource_group_name = azurerm_resource_group.main.name
-  virtual_networks_to_link = {
-    (module.vnet.vnet_name) = {
-      virtual_network_id = module.vnet.vnet_id
-    }
-  }
-  tags = var.tags
-}
-
-module "dns_vault" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.vaultcore.azure.net"
-  resource_group_name = azurerm_resource_group.main.name
-  virtual_networks_to_link = {
-    (module.vnet.vnet_name) = {
-      virtual_network_id = module.vnet.vnet_id
-    }
-  }
-  tags = var.tags
-}
-
-module "dns_azurewebsites" {
-  source              = "./modules/private_dns_zone"
-  name                = "privatelink.azurewebsites.net"
-  resource_group_name = azurerm_resource_group.main.name
-  virtual_networks_to_link = {
-    (module.vnet.vnet_name) = {
-      virtual_network_id = module.vnet.vnet_id
-    }
-  }
-  tags = var.tags
-}
-
 ###############################
-# New Services
+# Services (Azure Functions, Logic Apps, Storage, AI)
 ###############################
 
-# Azure Functions (Premium, VNet integrated with Managed Identity)
+# Azure Functions (Premium, VNet integrated)
 module "functions" {
   source              = "./modules/azure_functions"
   functions_name      = var.functions_name
@@ -186,7 +137,7 @@ module "functions" {
 }
 
 
-# Storage Account (existing module)
+# Storage Account
 module "storage" {
   source                 = "./modules/storage_account"
   resource_group_name    = azurerm_resource_group.main.name
@@ -197,37 +148,17 @@ module "storage" {
   tags                   = var.tags
 }
 
-# Private Endpoint for Storage Blob
-module "storage_private_endpoint_blob" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.storage.storage_account_name}-blob"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.main.name
-  subnet_id                      = module.vnet.subnet_ids[var.ai_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.storage.id
-  is_manual_connection           = false
-  subresource_name               = "blob"
-  private_dns_zone_group_name    = "StorageBlobPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_blob.id]
+# Azure Cognitive Search
+module "search" {
+  source              = "./modules/azure_search"
+  search_service_name = var.search_service_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.location
+  sku                 = var.search_sku
+  tags                = var.tags
 }
 
-# Private Endpoint for Storage Table
-module "storage_private_endpoint_table" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.storage.storage_account_name}-table"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.main.name
-  subnet_id                      = module.vnet.subnet_ids[var.ai_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.storage.id
-  is_manual_connection           = false
-  subresource_name               = "table"
-  private_dns_zone_group_name    = "StorageTablePrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_table.id]
-}
-
-# Logic Apps Standard (VNet integrated with Managed Identity)
+# Logic Apps Standard (VNet integrated)
 module "logic_apps" {
   source                         = "./modules/logic_apps"
   logic_apps_name                = var.logic_apps_name
@@ -240,31 +171,7 @@ module "logic_apps" {
   tags                           = var.tags
 }
 
-# Azure Cognitive Search (with private endpoint)
-module "search" {
-  source              = "./modules/azure_search"
-  search_service_name = var.search_service_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  sku                 = var.search_sku
-  tags                = var.tags
-}
-
-module "search_private_endpoint" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.search.search_service_name}"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.main.name
-  subnet_id                      = module.vnet.subnet_ids[var.ai_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.search.id
-  is_manual_connection           = false
-  subresource_name               = "searchService"
-  private_dns_zone_group_name    = "SearchPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_search.id]
-}
-
-# Azure OpenAI (with private endpoint)
+# Azure OpenAI
 module "openai" {
   source              = "./modules/azure_openai"
   openai_name         = var.openai_name
@@ -273,19 +180,6 @@ module "openai" {
   tags                = var.tags
 }
 
-module "openai_private_endpoint" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.openai.openai_name}"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.main.name
-  subnet_id                      = module.vnet.subnet_ids[var.ai_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.openai.id
-  is_manual_connection           = false
-  subresource_name               = "openAI"
-  private_dns_zone_group_name    = "OpenAIPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [module.dns_openai.id]
-}
 
 /*
 # (Optional) Key Vault with Private Endpoint
