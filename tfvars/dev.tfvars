@@ -72,20 +72,32 @@ nsg_ai_rules = [
   }
 ]
 
+# Log Analytics Workspace ID
+log_analytics_workspace_id = "/subscriptions/your_subscription_id/resourceGroups/your_rg/providers/Microsoft.OperationalInsights/workspaces/your_workspace"
+
 # Azure Functions
-functions_name = "func-ne"
-functions_sku  = "P1v2"
+functions_name           = "func-ne"
+functions_sku            = "P1v2"
+app_service_plan_tier    = "Dynamic"    # or "PremiumV2" as needed
+app_service_plan_size    = "Y1"         # e.g., Y1 for consumption; P1v2 for premium
+function_app_version     = "~4"         # or "~3" as required
+functions_worker_runtime = "dotnet"     # or "python", "node", etc.
 
 # Logic Apps
-logic_apps_name = "logicapps-ne"
-logic_apps_sku  = "Standard"
-logic_apps_storage_account_name       = "stlogicappsne"
-logic_apps_storage_account_access_key = "your_logicapps_storage_access_key_here"
+logic_apps_name                           = "logicapps-ne"
+logic_apps_sku                            = "Standard"
+logic_apps_storage_account_name           = "stlogicappsne"
+logic_apps_storage_account_access_key     = "your_logicapps_storage_access_key_here"
 
 # Storage Account
 storage_account_name             = "storne"
+storage_account_kind             = "StorageV2"
 storage_account_tier             = "Standard"
 storage_account_replication_type = "LRS"
+is_hns_enabled                   = false
+default_action                   = "Allow"
+ip_rules                         = []
+virtual_network_subnet_ids       = []
 
 # Azure Cognitive Search
 search_service_name = "search-ne"
@@ -93,19 +105,3 @@ search_sku          = "standard"
 
 # Azure OpenAI
 openai_name = "openai-ne"
-
-/*
-# Key Vault (Optional)
-key_vault_name = "kv-ne"
-tenant_id      = "your-tenant-id-here"
-key_vault_sku  = "standard"
-key_vault_enabled_for_deployment          = false
-key_vault_enabled_for_disk_encryption     = false
-key_vault_enabled_for_template_deployment = false
-key_vault_enable_rbac_authorization       = false
-key_vault_purge_protection_enabled        = false
-key_vault_soft_delete_retention_days      = 7
-key_vault_bypass           = "AzureServices"
-key_vault_default_action   = "Deny"
-key_vault_ip_rules         = []
-*/

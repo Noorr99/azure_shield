@@ -1,3 +1,4 @@
+// Resource & General Settings
 variable "resource_group_name" {
   description = "Name of the resource group for all resources."
   type        = string
@@ -13,6 +14,7 @@ variable "tags" {
   type        = map(string)
 }
 
+// Virtual Network Settings
 variable "vnet_name" {
   description = "Name of the Virtual Network."
   type        = string
@@ -23,6 +25,7 @@ variable "vnet_address_space" {
   type        = list(string)
 }
 
+// Subnet Settings
 variable "services_subnet_name" {
   description = "Name of the subnet for services (Functions, Logic Apps)."
   type        = string
@@ -43,6 +46,7 @@ variable "ai_subnet_address_prefixes" {
   type        = list(string)
 }
 
+// NSG Settings
 variable "nsg_services_name" {
   description = "Name of the NSG for the services subnet."
   type        = string
@@ -70,18 +74,19 @@ variable "log_analytics_workspace_id" {
   type        = string
 }
 
+// Azure Functions Variables
 variable "functions_name" {
   description = "Name of the Azure Functions app."
   type        = string
 }
 
 variable "functions_sku" {
-  description = "SKU for the Azure Functions app (for example, P1v2 or Y1)."
+  description = "SKU for the Azure Functions app (e.g., P1v2 or Y1)."
   type        = string
 }
 
 variable "app_service_plan_tier" {
-  description = "Tier for the App Service Plan (e.g., Dynamic, PremiumV2)."
+  description = "Tier for the App Service Plan (e.g., Dynamic or PremiumV2)."
   type        = string
 }
 
@@ -91,15 +96,16 @@ variable "app_service_plan_size" {
 }
 
 variable "function_app_version" {
-  description = "Version for the function app (e.g., ~3 or ~4)."
+  description = "Version for the Function App (e.g., ~3 or ~4)."
   type        = string
 }
 
 variable "functions_worker_runtime" {
-  description = "Worker runtime for the Functions app (e.g., dotnet, node, python)."
+  description = "Worker runtime for the Functions app (e.g., dotnet, python, node)."
   type        = string
 }
 
+// Logic Apps Variables
 variable "logic_apps_name" {
   description = "Name of the Logic Apps instance."
   type        = string
@@ -115,6 +121,12 @@ variable "logic_apps_storage_account_name" {
   type        = string
 }
 
+variable "logic_apps_storage_account_access_key" {
+  description = "Access key for the storage account used by Logic Apps."
+  type        = string
+}
+
+// Storage Account Variables
 variable "storage_account_name" {
   description = "Name of the storage account."
   type        = string
@@ -160,16 +172,18 @@ variable "virtual_network_subnet_ids" {
   default     = []
 }
 
+// Azure Cognitive Search Variables
 variable "search_service_name" {
   description = "Name of the Azure Cognitive Search service."
   type        = string
 }
 
 variable "search_sku" {
-  description = "SKU for the Search service (e.g., standard)."
+  description = "SKU for the Azure Cognitive Search service (e.g., standard)."
   type        = string
 }
 
+// Azure OpenAI Variables
 variable "openai_name" {
   description = "Name of the Azure OpenAI service."
   type        = string
