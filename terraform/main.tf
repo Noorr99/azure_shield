@@ -18,7 +18,6 @@ terraform {
 provider "azurerm" {
   features {}
 }
-
 #############################################
 # Resource Group
 #############################################
@@ -29,30 +28,26 @@ resource "azurerm_resource_group" "rg" {
 }
 
 #############################################
-# Cognitive Services Account (OpenAI)
+# Cognitive Account (OpenAI)
 #############################################
 
-resource "azurerm_cognitive_services_account" "noorsheild" {
+resource "azurerm_cognitive_account" "noorsheild" {
   name                = var.accounts_noorsheild_name
   location            = "eastus"  // as in your ARM template
   resource_group_name = azurerm_resource_group.rg.name
   kind                = "OpenAI"
   sku_name            = "S0"
 
-  api_properties         = {} 
   custom_sub_domain_name = var.accounts_noorsheild_name
 
   network_acls {
     default_action       = "Allow"
-    virtual_network_rules = []  // add if needed
+    virtual_network_subnet_ids = []  // add IDs if needed
     ip_rules              = []
   }
 
-  public_network_access = "Disabled"
+  public_network_access_enabled = false
 }
-
-# Note: The ARM sub-resources such as DefenderForAISettings and RAI policies are not yet available
-# as native Terraform resources. They could be added later via the "azapi_resource" if needed.
 
 #############################################
 # Application Insights Component
@@ -65,7 +60,6 @@ resource "azurerm_application_insights" "sheildnetwork" {
   application_type    = "web"
   retention_in_days   = 90
 
-  # If you need to link a Log Analytics workspace, set workspace_id accordingly.
   workspace_id = var.workspaces_DefaultWorkspace_3e169b7b_edb6_4452_94b0_847f2917971a_NEU_externalid
 }
 
@@ -157,8 +151,6 @@ resource "azurerm_search_service" "aisrch_noorsheild" {
 
   public_network_access_enabled = false
   hosting_mode                  = "default"
-
-  // Additional properties (encryption, auth options) can be added if supported.
 }
 
 #############################################
@@ -171,13 +163,12 @@ resource "azurerm_storage_account" "rgnetworking9b4d" {
   location                 = "northeurope"
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  allow_blob_public_access = false
   min_tls_version          = "TLS1_2"
   access_tier              = "Hot"
 
   network_rules {
     default_action = "Allow"
-    bypass         = "AzureServices"
+    bypass         = ["AzureServices"]
   }
 }
 
@@ -187,13 +178,12 @@ resource "azurerm_storage_account" "sheildnoor" {
   location                 = "northeurope"
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  allow_blob_public_access = false
   min_tls_version          = "TLS1_2"
   access_tier              = "Hot"
 
   network_rules {
     default_action = "Deny"
-    bypass         = "AzureServices"
+    bypass         = ["AzureServices"]
   }
 }
 
@@ -203,13 +193,12 @@ resource "azurerm_storage_account" "rgnetworkingb244" {
   location                 = "northeurope"
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  allow_blob_public_access = false
   min_tls_version          = "TLS1_2"
   access_tier              = "Hot"
 
   network_rules {
-    default_action = "Deny"
-    bypass         = "AzureServices"
+    default_action           = "Deny"
+    bypass                   = ["AzureServices"]
     virtual_network_subnet_ids = [
       azurerm_subnet.subnet_outbound.id
     ]
@@ -217,15 +206,15 @@ resource "azurerm_storage_account" "rgnetworkingb244" {
 }
 
 #############################################
-# App Service Plans
+# Service Plans (using azurerm_service_plan)
 #############################################
 
-resource "azurerm_app_service_plan" "asp_rgnetworking_81f2" {
+resource "azurerm_service_plan" "asp_rgnetworking_81f2" {
   name                = var.serverfarms_ASP_rgnetworking_81f2_name
   location            = "North Europe"
   resource_group_name = azurerm_resource_group.rg.name
-  kind                = "functionapp"
-  reserved            = true
+  kind                = "Windows"  // For Windows-based web apps
+  reserved            = false
 
   sku {
     tier = "FlexConsumption"
@@ -233,12 +222,12 @@ resource "azurerm_app_service_plan" "asp_rgnetworking_81f2" {
   }
 }
 
-resource "azurerm_app_service_plan" "asp_rgnetworking_b8b4" {
+resource "azurerm_service_plan" "asp_rgnetworking_b8b4" {
   name                = var.serverfarms_ASP_rgnetworking_b8b4_name
   location            = "North Europe"
   resource_group_name = azurerm_resource_group.rg.name
-  kind                = "elastic"  // for workflow apps
-  reserved            = false
+  kind                = "Linux"  // For Linux function apps
+  reserved            = true
 
   sku {
     tier = "WorkflowStandard"
@@ -254,7 +243,7 @@ resource "azurerm_function_app" "noor_shields" {
   name                       = var.sites_noor_shields_name
   location                   = "North Europe"
   resource_group_name        = azurerm_resource_group.rg.name
-  app_service_plan_id        = azurerm_app_service_plan.asp_rgnetworking_b8b4.id
+  service_plan_id            = azurerm_service_plan.asp_rgnetworking_b8b4.id
   storage_account_name       = azurerm_storage_account.rgnetworking9b4d.name
   storage_account_access_key = azurerm_storage_account.rgnetworking9b4d.primary_access_key
 
@@ -264,7 +253,7 @@ resource "azurerm_function_app" "noor_shields" {
   site_config {
     always_on         = false
     number_of_workers = 1
-    http20_enabled    = false
+    http2_enabled     = false
   }
 
   identity {
@@ -272,19 +261,18 @@ resource "azurerm_function_app" "noor_shields" {
   }
 }
 
-resource "azurerm_web_app" "sheildnetwork" {
+resource "azurerm_windows_web_app" "sheildnetwork" {
   name                = var.sites_sheildnetwork_name
   location            = "North Europe"
   resource_group_name = azurerm_resource_group.rg.name
-  app_service_plan_id = azurerm_app_service_plan.asp_rgnetworking_81f2.id
+  service_plan_id     = azurerm_service_plan.asp_rgnetworking_81f2.id
 
   site_config {
-    always_on              = false
-    number_of_workers      = 1
-    net_framework_version  = "v4.0"
-    http20_enabled         = false
-    ftps_state             = "FtpsOnly"
-    // Additional settings (virtual applications, IP restrictions, etc.) can be added here.
+    always_on             = false
+    number_of_workers     = 1
+    net_framework_version = "v4.0"
+    http2_enabled         = false
+    ftps_state            = "FtpsOnly"
   }
 
   identity {
@@ -309,10 +297,8 @@ resource "azurerm_subnet" "subnet_services" {
   virtual_network_name = azurerm_virtual_network.vnet_prod.name
   address_prefixes     = ["10.0.1.0/24"]
 
-  network_security_group_id = azurerm_network_security_group.nsg_subnet_services.id
-
-  # You can disable private endpoint policies if needed:
-  enforce_private_link_endpoint_network_policies = false
+  // Do not set NSG here; use a separate association resource.
+  private_endpoint_network_policies = "Disabled"
 }
 
 resource "azurerm_subnet" "subnet_ai" {
@@ -321,9 +307,7 @@ resource "azurerm_subnet" "subnet_ai" {
   virtual_network_name = azurerm_virtual_network.vnet_prod.name
   address_prefixes     = ["10.0.2.0/24"]
 
-  network_security_group_id = azurerm_network_security_group.nsg_subnet_ai.id
-
-  enforce_private_link_endpoint_network_policies = false
+  private_endpoint_network_policies = "Disabled"
 }
 
 resource "azurerm_subnet" "subnet_outbound" {
@@ -332,25 +316,35 @@ resource "azurerm_subnet" "subnet_outbound" {
   virtual_network_name = azurerm_virtual_network.vnet_prod.name
   address_prefixes     = ["10.0.0.0/24"]
 
-  # For outbound delegation (e.g. to App Service environments)
   delegation {
     name = "delegation"
     service_delegation {
-      name = "Microsoft.App/environments"
-      actions = [
-        "Microsoft.Network/virtualNetworks/subnets/action"
-      ]
+      name    = "Microsoft.App/environments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
   }
 
-  enforce_private_link_endpoint_network_policies = false
+  private_endpoint_network_policies = "Disabled"
+}
+
+#############################################
+# NSG Associations for Subnets
+#############################################
+
+resource "azurerm_subnet_network_security_group_association" "assoc_services" {
+  subnet_id                 = azurerm_subnet.subnet_services.id
+  network_security_group_id = azurerm_network_security_group.nsg_subnet_services.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "assoc_ai" {
+  subnet_id                 = azurerm_subnet.subnet_ai.id
+  network_security_group_id = azurerm_network_security_group.nsg_subnet_ai.id
 }
 
 #############################################
 # Private Endpoints
 #############################################
 
-# Private Endpoint for noorfunction (pointing to the sheildnetwork web app)
 resource "azurerm_private_endpoint" "noorfunction_pe" {
   name                = var.privateEndpoints_noorfunction_name
   location            = "northeurope"
@@ -360,13 +354,12 @@ resource "azurerm_private_endpoint" "noorfunction_pe" {
 
   private_service_connection {
     name                           = var.privateEndpoints_noorfunction_name
-    private_connection_resource_id = azurerm_web_app.sheildnetwork.id
+    private_connection_resource_id = azurerm_windows_web_app.sheildnetwork.id
     subresource_names              = ["sites"]
     is_manual_connection           = false
   }
 }
 
-# Private Endpoint for Search Service
 resource "azurerm_private_endpoint" "pe_aisrch" {
   name                = var.privateEndpoints_pe_aisrch_name
   location            = "northeurope"
@@ -382,7 +375,6 @@ resource "azurerm_private_endpoint" "pe_aisrch" {
   }
 }
 
-# Private Endpoint for Storage Account (sheildnoor)
 resource "azurerm_private_endpoint" "pe_blob" {
   name                = var.privateEndpoints_pe_blob_name
   location            = "northeurope"
@@ -398,7 +390,6 @@ resource "azurerm_private_endpoint" "pe_blob" {
   }
 }
 
-# Private Endpoint for noorshield (Web App noor_shields)
 resource "azurerm_private_endpoint" "pe_noorshield" {
   name                = var.privateEndpoints_pe_noorshield_name
   location            = "northeurope"
@@ -414,7 +405,6 @@ resource "azurerm_private_endpoint" "pe_noorshield" {
   }
 }
 
-# Private Endpoint for Cognitive Services (OpenAI) – “pe-openai-east”
 resource "azurerm_private_endpoint" "pe_openai_east" {
   name                = var.privateEndpoints_pe_openai_east_name
   location            = "northeurope"
@@ -424,7 +414,7 @@ resource "azurerm_private_endpoint" "pe_openai_east" {
 
   private_service_connection {
     name                           = var.privateEndpoints_pe_openai_east_name
-    private_connection_resource_id = azurerm_cognitive_services_account.noorsheild.id
+    private_connection_resource_id = azurerm_cognitive_account.noorsheild.id
     subresource_names              = ["account"]
     is_manual_connection           = false
   }
@@ -466,31 +456,6 @@ resource "azurerm_private_dns_zone_virtual_network_link" "link_search_windows" {
   registration_enabled  = false
 }
 
-# (For the SOA records and A-records you can use the following resources if needed)
-# Example: azurerm_private_dns_a_record and azurerm_private_dns_soa_record.
-
 #############################################
-# Web App Virtual Network Connection
+# (Additional resources may be added below)
 #############################################
-
-resource "azurerm_web_app_virtual_network_connection" "sheildnetwork_vnet_conn" {
-  name                = "${var.sites_sheildnetwork_name}-vnetconn"
-  resource_group_name = azurerm_resource_group.rg.name
-  web_app_id          = azurerm_web_app.sheildnetwork.id
-  subnet_id           = azurerm_subnet.subnet_outbound.id
-
-  // isSwift is available in some versions – adjust if needed.
-  is_swift = true
-}
-
-#############################################
-# (Additional resources)
-#############################################
-# You can add additional resources for:
-# - Storage Blob, File, Queue, and Table service configurations (e.g. using azurerm_storage_container,
-#   azurerm_storage_share, azurerm_storage_queue, and azurerm_storage_table).
-# - Host name bindings and basic publishing credentials for the web apps (see resource "azurerm_web_app" arguments
-#   or use azurerm_app_service_custom_hostname_binding).
-# - Proactive Detection configurations for Application Insights are not yet available as native Terraform resources.
-# - Private DNS record sets (using azurerm_private_dns_a_record and azurerm_private_dns_soa_record).
-
