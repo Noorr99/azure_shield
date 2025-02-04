@@ -32,9 +32,9 @@ provider "azapi" {
   # no extra config needed
 }
 
-############################################
-# 3. Variables
-############################################
+#########################################
+# 3. Variables (unique names)
+#########################################
 variable "location" {
   type    = string
   default = "eastus"
@@ -75,24 +75,24 @@ variable "openai_account_name" {
   default = "openai-shelidnoor"
 }
 
-############################################
+#########################################
 # 4. Resource Group
-############################################
+#########################################
 resource "azurerm_resource_group" "main" {
   name     = var.resource_group_name
   location = var.location
 }
 
-############################################
+#########################################
 # 5. Storage Account (Blob + Table)
-############################################
+#########################################
 resource "azurerm_storage_account" "main" {
   name                     = var.storage_account_name
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  kind                     = "StorageV2"
+  # Remove "kind" argument (no longer required / recognized)
 }
 
 resource "azurerm_storage_container" "documents" {
@@ -106,9 +106,9 @@ resource "azurerm_storage_table" "checklist" {
   storage_account_name = azurerm_storage_account.main.name
 }
 
-############################################
+#########################################
 # 6. Logic App (Consumption)
-############################################
+#########################################
 resource "azurerm_logic_app_workflow" "main" {
   name                = var.logic_app_name
   location            = azurerm_resource_group.main.location
@@ -126,25 +126,26 @@ resource "azurerm_logic_app_action_http" "sample_http_action" {
   }
 }
 
-############################################
-# 7. Function App (for OCR & Indexing)
-############################################
-resource "azurerm_app_service_plan" "function_plan" {
+#########################################
+# 7. Service Plan + Function App
+#########################################
+# Replaces the deprecated "azurerm_app_service_plan" with "azurerm_service_plan"
+resource "azurerm_service_plan" "function_plan" {
   name                = var.app_service_plan_name
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  kind                = "FunctionApp"
-  sku {
-    tier = "Dynamic"
-    size = "Y1"
-  }
+
+  # For a serverless Consumption plan for Functions:
+  sku_name = "Y1"
+  sku_tier = "Dynamic"
+  kind     = "functionapp"
 }
 
 resource "azurerm_function_app" "main" {
   name                       = var.function_app_name
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
-  app_service_plan_id        = azurerm_app_service_plan.function_plan.id
+  service_plan_id            = azurerm_service_plan.function_plan.id
   storage_account_name       = azurerm_storage_account.main.name
   storage_account_access_key = azurerm_storage_account.main.primary_access_key
   version                    = "~3"
@@ -158,25 +159,24 @@ resource "azurerm_function_app" "main" {
   # }
 }
 
-############################################
+#########################################
 # 8. Azure Cognitive Search
-############################################
+#########################################
 resource "azurerm_search_service" "main" {
   name                = var.search_service_name
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
 
-  sku {
-    name = "basic"
-  }
+  # Instead of a "sku" block, define it as an argument
+  sku = "Basic"
 
-  replica_count   = 1
   partition_count = 1
+  replica_count   = 1
 }
 
-############################################
+#########################################
 # 9. Azure OpenAI (via azapi)
-############################################
+#########################################
 resource "azapi_resource" "openai_account" {
   type      = "Microsoft.CognitiveServices/accounts@2022-12-01"
   name      = var.openai_account_name
@@ -211,9 +211,9 @@ resource "azapi_resource" "openai_deployment" {
   })
 }
 
-############################################
+#########################################
 # 10. Outputs
-############################################
+#########################################
 output "storage_account_name" {
   description = "Name of the Storage Account"
   value       = azurerm_storage_account.main.name
