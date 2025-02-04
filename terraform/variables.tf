@@ -1,3 +1,4 @@
+/*
 variable "resource_group_name" {
   description = "Name of the resource group."
   type        = string
@@ -159,3 +160,5 @@ variable "workspaces_DefaultWorkspace_3e169b7b_edb6_4452_94b0_847f2917971a_NEU_e
   type        = string
   default     = ""  # supply your workspace resource ID here
 }
+
+*/
