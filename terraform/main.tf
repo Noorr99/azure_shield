@@ -70,6 +70,17 @@ resource "azurerm_private_dns_zone" "functions" {
   resource_group_name = azurerm_resource_group.shield_noor.name
 }
 
+# Add after existing DNS zones
+resource "azurerm_private_dns_zone" "acr" {
+  name                = "privatelink.azurecr.io"
+  resource_group_name = azurerm_resource_group.shield_noor.name
+}
+
+resource "azurerm_private_dns_zone" "containerapps" {
+  name                = "privatelink.azurecontainerapps.io"
+  resource_group_name = azurerm_resource_group.shield_noor.name
+}
+
 # VNet Links
 resource "azurerm_private_dns_zone_virtual_network_link" "openai" {
   name                  = "openai-link"
@@ -105,6 +116,22 @@ resource "azurerm_private_dns_zone_virtual_network_link" "functions" {
   private_dns_zone_name = azurerm_private_dns_zone.functions.name
   virtual_network_id    = azurerm_virtual_network.shield_noor.id
 }
+
+# Add after existing VNet links
+resource "azurerm_private_dns_zone_virtual_network_link" "acr" {
+  name                  = "acr-link"
+  resource_group_name   = azurerm_resource_group.shield_noor.name
+  private_dns_zone_name = azurerm_private_dns_zone.acr.name
+  virtual_network_id    = azurerm_virtual_network.shield_noor.id
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "containerapps" {
+  name                  = "containerapps-link"
+  resource_group_name   = azurerm_resource_group.shield_noor.name
+  private_dns_zone_name = azurerm_private_dns_zone.containerapps.name
+  virtual_network_id    = azurerm_virtual_network.shield_noor.id
+}
+
 
 # Azure OpenAI
 resource "azapi_resource" "shield_noor_openai" {
@@ -285,5 +312,92 @@ resource "azurerm_private_endpoint" "function" {
     private_connection_resource_id = azurerm_linux_function_app.shield_noor.id
     is_manual_connection           = false
     subresource_names             = ["sites"]
+  }
+}
+
+
+# Add Container Registry
+resource "azurerm_container_registry" "shield_noor" {
+  name                          = "shieldnoorregistry"
+  resource_group_name          = azurerm_resource_group.shield_noor.name
+  location                     = azurerm_resource_group.shield_noor.location
+  sku                          = "Premium"
+  admin_enabled               = true
+  public_network_access_enabled = false
+}
+
+# Add Container Registry Private Endpoint
+resource "azurerm_private_endpoint" "acr" {
+  name                = "shield-noor-acr-endpoint"
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  subnet_id           = azurerm_subnet.other_services.id
+
+  private_dns_zone_group {
+    name                 = "acr-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.acr.id]
+  }
+
+  private_service_connection {
+    name                           = "acr-connection"
+    private_connection_resource_id = azurerm_container_registry.shield_noor.id
+    is_manual_connection           = false
+    subresource_names             = ["registry"]
+  }
+}
+
+# Add Container Apps Environment
+resource "azurerm_container_app_environment" "shield_noor" {
+  name                       = "shield-noor-env"
+  location                   = azurerm_resource_group.shield_noor.location
+  resource_group_name        = azurerm_resource_group.shield_noor.name
+  infrastructure_subnet_id   = azurerm_subnet.other_services.id
+}
+
+# Add Container App
+resource "azurerm_container_app" "shield_noor" {
+  name                         = "shield-noor-app"
+  container_app_environment_id = azurerm_container_app_environment.shield_noor.id
+  resource_group_name         = azurerm_resource_group.shield_noor.name
+  revision_mode               = "Single"
+
+  template {
+    container {
+      name   = "shield-noor-container"
+      image  = "${azurerm_container_registry.shield_noor.login_server}/sample-app:latest"
+      cpu    = 0.25
+      memory = "0.5Gi"
+    }
+  }
+
+  registry {
+    server               = azurerm_container_registry.shield_noor.login_server
+    username            = azurerm_container_registry.shield_noor.admin_username
+    password_secret_name = "registry-password"
+  }
+
+  ingress {
+    external_enabled = false
+    target_port     = 80
+  }
+}
+
+# Add Container Apps Private Endpoint
+resource "azurerm_private_endpoint" "containerapps" {
+  name                = "shield-noor-containerapps-endpoint"
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  subnet_id           = azurerm_subnet.other_services.id
+
+  private_dns_zone_group {
+    name                 = "containerapps-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.containerapps.id]
+  }
+
+  private_service_connection {
+    name                           = "containerapps-connection"
+    private_connection_resource_id = azurerm_container_app_environment.shield_noor.id
+    is_manual_connection           = false
+    subresource_names             = ["containerapp"]
   }
 }
