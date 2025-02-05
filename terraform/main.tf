@@ -90,12 +90,16 @@ resource "azurerm_linux_function_app" "shield_noor" {
   name                = "shield-noor-function"
   resource_group_name = azurerm_resource_group.shield_noor.name
   location            = azurerm_resource_group.shield_noor.location
-  app_service_plan_id = azurerm_app_service_plan.shield_noor.id
+  service_plan_id     = azurerm_service_plan.shield_noor.id
   storage_account_name = azurerm_storage_account.shield_noor.name
   storage_account_access_key = azurerm_storage_account.shield_noor.primary_access_key
+
+  site_config {
+    linux_fx_version = "DOCKER|mcr.microsoft.com/azure-functions/dotnet:3.0"
+  }
 }
 
-resource "azurerm_app_service_plan" "shield_noor" {
+resource "azurerm_service_plan" "shield_noor" {
   name                = "shield-noor-service-plan"
   location            = azurerm_resource_group.shield_noor.location
   resource_group_name = azurerm_resource_group.shield_noor.name
