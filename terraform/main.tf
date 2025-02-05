@@ -40,21 +40,39 @@ resource "azurerm_subnet" "ai_services" {
   name                 = "${var.project_name}-ai-services"
   resource_group_name  = azurerm_resource_group.shield_noor.name
   virtual_network_name = azurerm_virtual_network.shield_noor.name
-  address_prefixes     = [var.subnet_prefixes["ai_services"]]
+  address_prefixes     = ["10.0.1.0/24"]  # Keep existing range
+  
+  service_endpoints = [
+    "Microsoft.CognitiveServices",
+    "Microsoft.Web"
+  ]
 }
 
 resource "azurerm_subnet" "other_services" {
   name                 = "${var.project_name}-other-services"
   resource_group_name  = azurerm_resource_group.shield_noor.name
   virtual_network_name = azurerm_virtual_network.shield_noor.name
-  address_prefixes     = [var.subnet_prefixes["other_services"]]
+  address_prefixes     = ["10.0.2.0/24"]  # Keep existing range
+
+  service_endpoints = [
+    "Microsoft.CognitiveServices",
+    "Microsoft.Web"
+  ]
+
+  delegation {
+    name = "container-app-delegation"
+    service_delegation {
+      name    = "Microsoft.App/environments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
 }
 
 resource "azurerm_subnet" "management" {
   name                 = "${var.project_name}-management"
   resource_group_name  = azurerm_resource_group.shield_noor.name
   virtual_network_name = azurerm_virtual_network.shield_noor.name
-  address_prefixes     = [var.subnet_prefixes["management"]]
+  address_prefixes     = ["10.0.3.0/24"]  # Keep existing range
 }
 
 # Private DNS Zones
@@ -158,7 +176,8 @@ resource "azapi_resource" "shield_noor_openai" {
     }
     kind = "OpenAI"
     properties = {
-      customSubDomainName = "${var.project_name}-openai" # Add this line
+      customSubDomainName = "${var.project_name}-openai"
+      publicNetworkAccess = "Disabled"
       networkAcls = {
         defaultAction = "Deny"
         virtualNetworkRules = [
@@ -169,6 +188,8 @@ resource "azapi_resource" "shield_noor_openai" {
       }
     }
   })
+
+  depends_on = [azurerm_subnet.ai_services]
 }
 
 # Azure Cognitive Search
@@ -523,5 +544,3 @@ resource "azurerm_linux_virtual_machine" "management" {
               EOF
   )
 }
-
-
