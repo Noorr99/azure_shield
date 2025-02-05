@@ -2,6 +2,21 @@ provider "azurerm" {
   features {}
 }
 
+provider "azapi" {}
+
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~>3.45"
+    }
+    azapi = {
+      source  = "azure/azapi"
+      version = "~>1.3"
+    }
+  }
+}
+
 resource "azurerm_resource_group" "shield_noor" {
   name     = "shield-noor-resources"
   location = "East US"
@@ -28,15 +43,29 @@ resource "azurerm_subnet" "other_services" {
   address_prefixes     = ["10.0.2.0/24"]
 }
 
-# Azure OpenAI (Example)
-resource "azurerm_openai" "shield_noor" {
-  name                = "shield-noor-openai"
-  resource_group_name = azurerm_resource_group.shield_noor.name
-  location            = azurerm_resource_group.shield_noor.location
-  subnet_id           = azurerm_subnet.ai_services.id
-  private_endpoint {
-    subnet_id = azurerm_subnet.ai_services.id
-  }
+# Azure OpenAI
+resource "azapi_resource" "shield_noor_openai" {
+  type      = "Microsoft.CognitiveServices/accounts"
+  name      = "shield-noor-openai"
+  location  = azurerm_resource_group.shield_noor.location
+  parent_id = azurerm_resource_group.shield_noor.id
+
+  body = jsonencode({
+    sku = {
+      name = "S0"
+    }
+    kind     = "OpenAI"
+    properties = {
+      networkAcls = {
+        defaultAction = "Deny"
+        virtualNetworkRules = [
+          {
+            id = azurerm_subnet.ai_services.id
+          }
+        ]
+      }
+    }
+  })
 }
 
 # Azure Cognitive Search
@@ -47,10 +76,6 @@ resource "azurerm_search_service" "shield_noor" {
   sku                 = "basic"
   partition_count     = 1
   replica_count       = 1
-  subnet_id           = azurerm_subnet.ai_services.id
-  private_endpoint {
-    subnet_id = azurerm_subnet.ai_services.id
-  }
 }
 
 # Azure Logic Apps
@@ -58,10 +83,6 @@ resource "azurerm_logic_app_workflow" "shield_noor" {
   name                = "shield-noor-logicapp"
   resource_group_name = azurerm_resource_group.shield_noor.name
   location            = azurerm_resource_group.shield_noor.location
-  subnet_id           = azurerm_subnet.other_services.id
-  private_endpoint {
-    subnet_id = azurerm_subnet.other_services.id
-  }
 }
 
 # Azure Functions
@@ -69,9 +90,18 @@ resource "azurerm_function_app" "shield_noor" {
   name                = "shield-noor-function"
   resource_group_name = azurerm_resource_group.shield_noor.name
   location            = azurerm_resource_group.shield_noor.location
-  subnet_id           = azurerm_subnet.other_services.id
-  private_endpoint {
-    subnet_id = azurerm_subnet.other_services.id
+  app_service_plan_id = azurerm_app_service_plan.shield_noor.id
+  storage_account_name = azurerm_storage_account.shield_noor.name
+  storage_account_access_key = azurerm_storage_account.shield_noor.primary_access_key
+}
+
+resource "azurerm_app_service_plan" "shield_noor" {
+  name                = "shield-noor-service-plan"
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  sku {
+    tier = "Dynamic"
+    size = "Y1"
   }
 }
 
@@ -82,8 +112,4 @@ resource "azurerm_storage_account" "shield_noor" {
   location                 = azurerm_resource_group.shield_noor.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  subnet_id                = azurerm_subnet.other_services.id
-  private_endpoint {
-    subnet_id = azurerm_subnet.other_services.id
-  }
 }
