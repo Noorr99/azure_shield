@@ -24,7 +24,7 @@ output "storage_primary_access_key" {
 }
 
 output "cognitive_search_endpoint" {
-  value = azurerm_search_service.shield_noor.endpoint
+  value = "https://${azurerm_search_service.shield_noor.name}.search.windows.net"
 }
 
 output "openai_endpoint" {
@@ -33,6 +33,10 @@ output "openai_endpoint" {
 
 output "container_registry_login_server" {
   value = azurerm_container_registry.shield_noor.login_server
+}
+
+output "management_vm_public_ip" {
+  value = azurerm_public_ip.management.ip_address
 }
 
 output "container_registry_admin_username" {
@@ -46,10 +50,6 @@ output "container_registry_admin_password" {
 
 output "function_app_hostname" {
   value = azurerm_linux_function_app.shield_noor.default_hostname
-}
-
-output "management_vm_public_ip" {
-  value = azurerm_public_ip.management.ip_address
 }
 
 output "management_vm_private_ip" {
