@@ -15,6 +15,13 @@ terraform {
       version = "~>1.3"
     }
   }
+  backend "azurerm" {
+    resource_group_name  = "rg-terraform-storage"
+    storage_account_name = "terraformstgaks99"
+    container_name       = "tfstatesheilddevv"
+    key                  = "terraform.tfstate"
+  }
+}
 }
 
 # Base Infrastructure
