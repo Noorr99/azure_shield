@@ -19,29 +19,36 @@ terraform {
 
 # Base Infrastructure
 resource "azurerm_resource_group" "shield_noor" {
-  name     = "shield-noor-resources"
-  location = "East US"
+  name     = "${var.project_name}-resources"
+  location = var.location
 }
 
 resource "azurerm_virtual_network" "shield_noor" {
-  name                = "shield-noor-vnet"
-  address_space       = ["10.0.0.0/16"]
-  location            = azurerm_resource_group.shield_noor.location
+  name                = "${var.project_name}-vnet"
+  address_space       = var.vnet_address_space
+  location            = var.location
   resource_group_name = azurerm_resource_group.shield_noor.name
 }
 
 resource "azurerm_subnet" "ai_services" {
-  name                 = "shield-noor-ai-services"
+  name                 = "${var.project_name}-ai-services"
   resource_group_name  = azurerm_resource_group.shield_noor.name
   virtual_network_name = azurerm_virtual_network.shield_noor.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = [var.subnet_prefixes["ai_services"]]
 }
 
 resource "azurerm_subnet" "other_services" {
-  name                 = "shield-noor-other-services"
+  name                 = "${var.project_name}-other-services"
   resource_group_name  = azurerm_resource_group.shield_noor.name
   virtual_network_name = azurerm_virtual_network.shield_noor.name
-  address_prefixes     = ["10.0.2.0/24"]
+  address_prefixes     = [var.subnet_prefixes["other_services"]]
+}
+
+resource "azurerm_subnet" "management" {
+  name                 = "${var.project_name}-management"
+  resource_group_name  = azurerm_resource_group.shield_noor.name
+  virtual_network_name = azurerm_virtual_network.shield_noor.name
+  address_prefixes     = [var.subnet_prefixes["management"]]
 }
 
 # Private DNS Zones
@@ -132,17 +139,16 @@ resource "azurerm_private_dns_zone_virtual_network_link" "containerapps" {
   virtual_network_id    = azurerm_virtual_network.shield_noor.id
 }
 
-
 # Azure OpenAI
 resource "azapi_resource" "shield_noor_openai" {
   type      = "Microsoft.CognitiveServices/accounts@2023-05-01"
-  name      = "shield-noor-openai"
-  location  = azurerm_resource_group.shield_noor.location
+  name      = "${var.project_name}-openai"
+  location  = var.location
   parent_id = azurerm_resource_group.shield_noor.id
 
   body = jsonencode({
     sku = {
-      name = "S0"
+      name = var.openai_sku
     }
     kind = "OpenAI"
     properties = {
@@ -160,29 +166,29 @@ resource "azapi_resource" "shield_noor_openai" {
 
 # Azure Cognitive Search
 resource "azurerm_search_service" "shield_noor" {
-  name                = "shield-noor-search"
-  resource_group_name = azurerm_resource_group.shield_noor.name
-  location            = azurerm_resource_group.shield_noor.location
-  sku                 = "basic"
-  partition_count     = 1
-  replica_count       = 1
+  name                          = "${var.project_name}-search"
+  resource_group_name           = azurerm_resource_group.shield_noor.name
+  location                      = var.location
+  sku                          = var.search_sku
+  partition_count               = 1
+  replica_count                = 1
   public_network_access_enabled = false
 }
 
 # Azure Storage Account
 resource "azurerm_storage_account" "shield_noor" {
-  name                     = "shieldnoorstorageacc"
-  resource_group_name      = azurerm_resource_group.shield_noor.name
-  location                 = azurerm_resource_group.shield_noor.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+  name                          = "${replace(var.project_name, "-", "")}storage"
+  resource_group_name           = azurerm_resource_group.shield_noor.name
+  location                      = var.location
+  account_tier                  = var.storage_account_tier
+  account_replication_type      = var.storage_replication_type
   public_network_access_enabled = false
 }
 
 # Azure Service Plan
 resource "azurerm_service_plan" "shield_noor" {
-  name                = "shield-noor-service-plan"
-  location            = azurerm_resource_group.shield_noor.location
+  name                = "${var.project_name}-service-plan"
+  location            = var.location
   resource_group_name = azurerm_resource_group.shield_noor.name
   os_type            = "Linux"
   sku_name           = "Y1"
@@ -315,14 +321,13 @@ resource "azurerm_private_endpoint" "function" {
   }
 }
 
-
 # Add Container Registry
 resource "azurerm_container_registry" "shield_noor" {
-  name                          = "shieldnoorregistry"
-  resource_group_name          = azurerm_resource_group.shield_noor.name
-  location                     = azurerm_resource_group.shield_noor.location
-  sku                          = "Premium"
-  admin_enabled               = true
+  name                          = "${replace(var.project_name, "-", "")}registry"
+  resource_group_name           = azurerm_resource_group.shield_noor.name
+  location                      = var.location
+  sku                          = var.acr_sku
+  admin_enabled                = true
   public_network_access_enabled = false
 }
 
@@ -406,21 +411,12 @@ resource "azurerm_private_endpoint" "containerapps" {
   }
 }
 
-
 // add VM:
-
-# Add Management Subnet
-resource "azurerm_subnet" "management" {
-  name                 = "shield-noor-management"
-  resource_group_name  = azurerm_resource_group.shield_noor.name
-  virtual_network_name = azurerm_virtual_network.shield_noor.name
-  address_prefixes     = ["10.0.3.0/24"]
-}
 
 # Create NSG
 resource "azurerm_network_security_group" "management" {
-  name                = "shield-noor-management-nsg"
-  location            = azurerm_resource_group.shield_noor.location
+  name                = "${var.project_name}-vm-nsg"
+  location            = var.location
   resource_group_name = azurerm_resource_group.shield_noor.name
 
   security_rule {
@@ -450,8 +446,8 @@ resource "azurerm_network_security_group" "management" {
 
 # Create Public IP
 resource "azurerm_public_ip" "management" {
-  name                = "shield-noor-management-ip"
-  location            = azurerm_resource_group.shield_noor.location
+  name                = "${var.project_name}-vm-ip"
+  location            = var.location
   resource_group_name = azurerm_resource_group.shield_noor.name
   allocation_method   = "Static"
   sku                = "Standard"
@@ -459,8 +455,8 @@ resource "azurerm_public_ip" "management" {
 
 # Create NIC
 resource "azurerm_network_interface" "management" {
-  name                = "shield-noor-management-nic"
-  location            = azurerm_resource_group.shield_noor.location
+  name                = "${var.project_name}-vm-nic"
+  location            = var.location
   resource_group_name = azurerm_resource_group.shield_noor.name
 
   ip_configuration {
@@ -479,13 +475,13 @@ resource "azurerm_network_interface_security_group_association" "management" {
 
 # Create Ubuntu Desktop VM
 resource "azurerm_linux_virtual_machine" "management" {
-  name                            = "shield-noor-management-vm"
-  location                        = azurerm_resource_group.shield_noor.location
+  name                            = "${var.project_name}-vm"
+  location                        = var.location
   resource_group_name             = azurerm_resource_group.shield_noor.name
   network_interface_ids           = [azurerm_network_interface.management.id]
-  size                           = "Standard_D2s_v3"
-  admin_username                  = "adminuser"
-  admin_password                  = "P@ssw0rd1234!"  # Change this in production
+  size                           = var.vm_size
+  admin_username                  = var.vm_admin_username
+  admin_password                  = var.vm_admin_password
   disable_password_authentication = false
 
   os_disk {
@@ -513,9 +509,4 @@ resource "azurerm_linux_virtual_machine" "management" {
               systemctl start xrdp
               EOF
   )
-}
-
-# Output VM public IP
-output "management_vm_public_ip" {
-  value = azurerm_public_ip.management.ip_address
 }

@@ -1,166 +1,76 @@
-///////////////////////////////
-// General Resource Group & Location
-///////////////////////////////
-variable "resource_group_name" {
-  description = "Name of the dedicated resource group."
+variable "project_name" {
   type        = string
-  default     = "rg-sheildnoor"
+  description = "Project name prefix for all resources"
+  default     = "shield-noor"
 }
 
 variable "location" {
-  description = "Azure region for all resources. (e.g., eastus, northeurope)"
   type        = string
-  default     = "eastus"   # Use eastus since OpenAI is supported there.
-}
-
-variable "tags" {
-  description = "Tags to apply to all resources."
-  type        = map(string)
-  default     = {
-    environment = "sheildnoor"
-    project     = "sheildnoor"
-  }
-}
-
-///////////////////////////////
-// Virtual Network & Subnets
-///////////////////////////////
-variable "vnet_name" {
-  description = "Name of the virtual network."
-  type        = string
-  default     = "vnet-sheildnoor"
+  description = "Azure region for all resources"
+  default     = "East US"
 }
 
 variable "vnet_address_space" {
-  description = "Address space for the virtual network."
   type        = list(string)
+  description = "Address space for Virtual Network"
   default     = ["10.0.0.0/16"]
 }
 
-variable "services_subnet_name" {
-  description = "Name of the subnet for services (Logic Apps, Azure Functions, etc.)."
+variable "subnet_prefixes" {
+  type        = map(string)
+  description = "Address prefixes for subnets"
+  default = {
+    ai_services    = "10.0.1.0/24"
+    other_services = "10.0.2.0/24"
+    management     = "10.0.3.0/24"
+  }
+}
+
+variable "vm_size" {
   type        = string
-  default     = "snet-sheildnoor-services"
+  description = "Size of the management VM"
+  default     = "Standard_D2s_v3"
 }
 
-variable "services_subnet_prefix" {
-  description = "Address prefix(es) for the services subnet."
-  type        = list(string)
-  default     = ["10.0.1.0/24"]
-}
-
-variable "pe_subnet_name" {
-  description = "Name of the subnet for private endpoints."
+variable "vm_admin_username" {
   type        = string
-  default     = "snet-sheildnoor-pe"
+  description = "Admin username for VM"
+  default     = "adminuser"
 }
 
-variable "pe_subnet_prefix" {
-  description = "Address prefix(es) for the private endpoints subnet."
-  type        = list(string)
-  default     = ["10.0.2.0/24"]
-}
-
-///////////////////////////////
-// NSG Variables for Subnets
-///////////////////////////////
-variable "services_nsg_name" {
-  description = "Name of the NSG for the services subnet."
+variable "vm_admin_password" {
   type        = string
-  default     = "nsg-sheildnoor-services"
-}
-
-variable "services_nsg_rules" {
-  description = "Security rules for the services subnet NSG."
-  type        = list(any)
-  default     = []
-}
-
-variable "pe_nsg_name" {
-  description = "Name of the NSG for the private endpoints subnet."
-  type        = string
-  default     = "nsg-sheildnoor-pe"
-}
-
-variable "pe_nsg_rules" {
-  description = "Security rules for the private endpoints subnet NSG."
-  type        = list(any)
-  default     = []
-}
-
-///////////////////////////////
-// Azure Storage Account Variables
-///////////////////////////////
-variable "storage_account_name" {
-  description = "Name of the storage account (must be all lowercase and globally unique)."
-  type        = string
-  default     = "stsheildnoor"
-}
-
-variable "storage_account_kind" {
-  description = "Kind of the storage account (e.g., StorageV2)."
-  type        = string
-  default     = "StorageV2"
+  description = "Admin password for VM"
+  sensitive   = true
+  default     = "P@ssw0rd1234!"
 }
 
 variable "storage_account_tier" {
-  description = "Account tier for the storage account (e.g., Standard or Premium)."
   type        = string
+  description = "Storage Account tier"
   default     = "Standard"
 }
 
 variable "storage_replication_type" {
-  description = "Replication type for the storage account (e.g., LRS, ZRS, etc.)."
   type        = string
+  description = "Storage Account replication type"
   default     = "LRS"
 }
 
-variable "storage_is_hns_enabled" {
-  description = "Enable hierarchical namespace on the storage account?"
-  type        = bool
-  default     = false
-}
-
-variable "storage_ip_rules" {
-  description = "IP rules for the storage account."
-  type        = list(string)
-  default     = []
-}
-
-///////////////////////////////
-// Azure OpenAI Variables
-///////////////////////////////
-variable "openai_name" {
-  description = "Name of the Azure OpenAI service."
+variable "search_sku" {
   type        = string
-  default     = "openai-sheildnoor"
+  description = "Azure Cognitive Search SKU"
+  default     = "basic"
 }
 
 variable "openai_sku" {
-  description = "SKU name for the Azure OpenAI service."
   type        = string
+  description = "Azure OpenAI SKU"
   default     = "S0"
 }
 
-variable "openai_custom_subdomain_name" {
-  description = "Custom subdomain name for the Azure OpenAI service."
+variable "acr_sku" {
   type        = string
-  default     = "sheildnoor-openai"
+  description = "Azure Container Registry SKU"
+  default     = "Premium"
 }
-
-variable "openai_deployments" {
-  description = "List of deployments for the Azure OpenAI service."
-  type = list(object({
-    name = string
-    model = object({
-      name    = string
-      version = string
-    })
-  }))
-  default = []
-}
-
-///////////////////////////////
-// Dummy Diagnostic Variable
-///////////////////////////////
-
