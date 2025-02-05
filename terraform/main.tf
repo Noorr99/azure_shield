@@ -97,12 +97,12 @@ resource "azurerm_service_plan" "shield_noor" {
 
 # Azure Storage Account – enforce HTTPS, disable public network access, and restrict to the other_services subnet.
 resource "azurerm_storage_account" "shield_noor" {
-  name                     = "shieldnoorstorageacc"
-  resource_group_name      = azurerm_resource_group.shield_noor.name
-  location                 = azurerm_resource_group.shield_noor.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  enable_https_traffic_only = true
+  name                          = "shieldnoorstorageacc"
+  resource_group_name           = azurerm_resource_group.shield_noor.name
+  location                      = azurerm_resource_group.shield_noor.location
+  account_tier                  = "Standard"
+  account_replication_type      = "LRS"
+  https_traffic_only_enabled    = true
   public_network_access_enabled = false
 
   network_rules {
