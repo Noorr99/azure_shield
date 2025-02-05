@@ -158,6 +158,7 @@ resource "azapi_resource" "shield_noor_openai" {
     }
     kind = "OpenAI"
     properties = {
+      customSubDomainName = "${var.project_name}-openai" # Add this line
       networkAcls = {
         defaultAction = "Deny"
         virtualNetworkRules = [
@@ -188,7 +189,13 @@ resource "azurerm_storage_account" "shield_noor" {
   location                      = var.location
   account_tier                  = var.storage_account_tier
   account_replication_type      = var.storage_replication_type
-  public_network_access_enabled = false
+  public_network_access_enabled = true # Temporarily enable this
+  network_rules {
+    default_action             = "Deny"
+    ip_rules                   = []
+    virtual_network_subnet_ids = [azurerm_subnet.other_services.id]
+    bypass                     = ["AzureServices"]
+  }
 }
 
 # Azure Service Plan
@@ -516,3 +523,5 @@ resource "azurerm_linux_virtual_machine" "management" {
               EOF
   )
 }
+
+

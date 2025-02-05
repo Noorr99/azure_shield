@@ -16,13 +16,14 @@ variable "vnet_address_space" {
   default     = ["10.0.0.0/16"]
 }
 
+# Update the subnet_prefixes variable in variables.tf
 variable "subnet_prefixes" {
   type        = map(string)
   description = "Address prefixes for subnets"
   default = {
     ai_services    = "10.0.1.0/24"
-    other_services = "10.0.2.0/24"
-    management     = "10.0.3.0/24"
+    other_services = "10.0.2.0/23"  # Changed from /24 to /23
+    management     = "10.0.4.0/24"  # Updated to avoid overlap
   }
 }
 
