@@ -22,7 +22,6 @@ terraform {
     key                  = "terraform.tfstate"
   }
 }
-}
 
 # Base Infrastructure
 resource "azurerm_resource_group" "shield_noor" {
