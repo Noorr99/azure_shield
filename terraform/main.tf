@@ -43,7 +43,7 @@ resource "azurerm_subnet" "other_services" {
   address_prefixes     = ["10.0.2.0/24"]
 }
 
-# Azure OpenAI
+# Azure OpenAI – Only allow traffic from the ai_services subnet.
 resource "azapi_resource" "shield_noor_openai" {
   type      = "Microsoft.CognitiveServices/accounts@2021-04-30"
   name      = "shield-noor-openai"
@@ -54,10 +54,10 @@ resource "azapi_resource" "shield_noor_openai" {
     sku = {
       name = "S0"
     }
-    kind     = "OpenAI"
+    kind       = "OpenAI"
     properties = {
       networkAcls = {
-        defaultAction = "Deny"
+        defaultAction         = "Deny"
         virtualNetworkRules = [
           {
             id = azurerm_subnet.ai_services.id
@@ -68,7 +68,7 @@ resource "azapi_resource" "shield_noor_openai" {
   })
 }
 
-# Azure Cognitive Search
+# Azure Cognitive Search – disable public network access.
 resource "azurerm_search_service" "shield_noor" {
   name                = "shield-noor-search"
   resource_group_name = azurerm_resource_group.shield_noor.name
@@ -76,6 +76,8 @@ resource "azurerm_search_service" "shield_noor" {
   sku                 = "basic"
   partition_count     = 1
   replica_count       = 1
+
+  public_network_access_enabled = false
 }
 
 # Azure Logic Apps
@@ -89,10 +91,27 @@ resource "azurerm_service_plan" "shield_noor" {
   name                = "shield-noor-service-plan"
   location            = azurerm_resource_group.shield_noor.location
   resource_group_name = azurerm_resource_group.shield_noor.name
-  os_type            = "Linux"
-  sku_name           = "Y1"  # This is the consumption plan SKU
+  os_type             = "Linux"
+  sku_name            = "Y1"  # Consumption plan SKU
 }
 
+# Azure Storage Account – enforce HTTPS, disable public network access, and restrict to the other_services subnet.
+resource "azurerm_storage_account" "shield_noor" {
+  name                     = "shieldnoorstorageacc"
+  resource_group_name      = azurerm_resource_group.shield_noor.name
+  location                 = azurerm_resource_group.shield_noor.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  enable_https_traffic_only = true
+  public_network_access_enabled = false
+
+  network_rules {
+    default_action             = "Deny"
+    virtual_network_subnet_ids = [azurerm_subnet.other_services.id]
+  }
+}
+
+# Azure Linux Function App – enforce HTTPS and restrict access via IP rules.
 resource "azurerm_linux_function_app" "shield_noor" {
   name                       = "shield-noor-function"
   resource_group_name        = azurerm_resource_group.shield_noor.name
@@ -100,19 +119,27 @@ resource "azurerm_linux_function_app" "shield_noor" {
   service_plan_id            = azurerm_service_plan.shield_noor.id
   storage_account_name       = azurerm_storage_account.shield_noor.name
   storage_account_access_key = azurerm_storage_account.shield_noor.primary_access_key
+  https_only                 = true
 
   site_config {
     application_stack {
       node_version = "16"
     }
-  }
-}
 
-# Azure Storage Account
-resource "azurerm_storage_account" "shield_noor" {
-  name                     = "shieldnoorstorageacc"
-  resource_group_name      = azurerm_resource_group.shield_noor.name
-  location                 = azurerm_resource_group.shield_noor.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
+    # Allow inbound requests only from the other_services subnet.
+    ip_restriction {
+      name       = "AllowOtherServices"
+      ip_address = "10.0.2.0/24"
+      action     = "Allow"
+      priority   = 100
+    }
+
+    # Deny all other inbound traffic.
+    ip_restriction {
+      name       = "DenyAll"
+      ip_address = "0.0.0.0/0"
+      action     = "Deny"
+      priority   = 200
+    }
+  }
 }
