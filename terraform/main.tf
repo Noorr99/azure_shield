@@ -1,193 +1,89 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "3.50"
-    }
-  }
-  backend "azurerm" {
-    resource_group_name  = "rg-terraform-storage"
-    storage_account_name = "terraformstgaks99"
-    container_name       = "tfstatesheilddev"
-    key                  = "terraform.tfstate"
-  }
-}
-
 provider "azurerm" {
   features {}
 }
 
-data "azurerm_client_config" "current" {}
-
-#############################
-# Resource Group
-#############################
-resource "azurerm_resource_group" "rg" {
-  name     = var.resource_group_name
-  location = var.location
-  tags     = var.tags
+resource "azurerm_resource_group" "shield_noor" {
+  name     = "shield-noor-resources"
+  location = "East US"
 }
 
-#############################
-# Virtual Network & Subnets
-#############################
-module "vnet" {
-  source              = "./modules/virtual_network"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
-  vnet_name           = var.vnet_name
-  address_space       = var.vnet_address_space
-
-  subnets = [
-    {
-      name                                          = var.services_subnet_name
-      address_prefixes                              = var.services_subnet_prefix
-      private_endpoint_network_policies_enabled     = true
-      private_link_service_network_policies_enabled = false
-    },
-    {
-      name                                          = var.pe_subnet_name
-      address_prefixes                              = var.pe_subnet_prefix
-      private_endpoint_network_policies_enabled     = false
-      private_link_service_network_policies_enabled = true
-    }
-  ]
+resource "azurerm_virtual_network" "shield_noor" {
+  name                = "shield-noor-vnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
 }
 
-#############################
-# NSG Modules and Associations
-#############################
-module "services_nsg" {
-  source                     = "./modules/network_security_group"
-  name                       = var.services_nsg_name
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = var.location
-  security_rules             = var.services_nsg_rules
-  tags                       = var.tags
-//  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value passed from variable.
+resource "azurerm_subnet" "ai_services" {
+  name                 = "shield-noor-ai-services"
+  resource_group_name  = azurerm_resource_group.shield_noor.name
+  virtual_network_name = azurerm_virtual_network.shield_noor.name
+  address_prefixes     = ["10.0.1.0/24"]
 }
 
-module "pe_nsg" {
-  source                     = "./modules/network_security_group"
-  name                       = var.pe_nsg_name
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = var.location
-  security_rules             = var.pe_nsg_rules
-  tags                       = var.tags
-//  log_analytics_workspace_id = var.log_analytics_workspace_id  # Dummy value.
+resource "azurerm_subnet" "other_services" {
+  name                 = "shield-noor-other-services"
+  resource_group_name  = azurerm_resource_group.shield_noor.name
+  virtual_network_name = azurerm_virtual_network.shield_noor.name
+  address_prefixes     = ["10.0.2.0/24"]
 }
 
-resource "azurerm_subnet_network_security_group_association" "services_assoc" {
-  subnet_id                 = module.vnet.subnet_ids[var.services_subnet_name]
-  network_security_group_id = module.services_nsg.id
-}
-
-resource "azurerm_subnet_network_security_group_association" "pe_assoc" {
-  subnet_id                 = module.vnet.subnet_ids[var.pe_subnet_name]
-  network_security_group_id = module.pe_nsg.id
-}
-
-#############################
-# Storage Account & Endpoints
-#############################
-module "storage_account" {
-  source                     = "./modules/storage_account"
-  resource_group_name        = azurerm_resource_group.rg.name
-  name                       = var.storage_account_name
-  location                   = var.location
-  account_kind               = var.storage_account_kind
-  account_tier               = var.storage_account_tier
-  replication_type           = var.storage_replication_type
-  is_hns_enabled             = var.storage_is_hns_enabled
-  tags                       = var.tags
-  default_action             = "Deny"
-  ip_rules                   = var.storage_ip_rules
-  virtual_network_subnet_ids = [ module.vnet.subnet_ids[var.pe_subnet_name] ]
-}
-
-module "storage_blob_private_dns_zone" {
-  source                   = "./modules/private_dns_zone"
-  name                     = "privatelink.blob.core.windows.net"
-  resource_group_name      = azurerm_resource_group.rg.name
-  virtual_networks_to_link = {
-    (var.vnet_name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg.name
-    }
+# Azure OpenAI (Example)
+resource "azurerm_openai" "shield_noor" {
+  name                = "shield-noor-openai"
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  location            = azurerm_resource_group.shield_noor.location
+  subnet_id           = azurerm_subnet.ai_services.id
+  private_endpoint {
+    subnet_id = azurerm_subnet.ai_services.id
   }
-  tags = var.tags
 }
 
-module "storage_table_private_dns_zone" {
-  source                   = "./modules/private_dns_zone"
-  name                     = "privatelink.table.core.windows.net"
-  resource_group_name      = azurerm_resource_group.rg.name
-  virtual_networks_to_link = {
-    (var.vnet_name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg.name
-    }
+# Azure Cognitive Search
+resource "azurerm_search_service" "shield_noor" {
+  name                = "shield-noor-search"
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  location            = azurerm_resource_group.shield_noor.location
+  sku                 = "basic"
+  partition_count     = 1
+  replica_count       = 1
+  subnet_id           = azurerm_subnet.ai_services.id
+  private_endpoint {
+    subnet_id = azurerm_subnet.ai_services.id
   }
-  tags = var.tags
 }
 
-module "storage_blob_private_endpoint" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.storage_account.name}-blob"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg.name
-  subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.storage_account.id
-  is_manual_connection           = false
-  subresource_name               = "blob"
-  private_dns_zone_group_name    = "StorageBlobPrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [ module.storage_blob_private_dns_zone.id ]
-  depends_on                     = [ module.storage_account ]
-}
-
-module "storage_table_private_endpoint" {
-  source                         = "./modules/private_endpoint"
-  name                           = "pe-${module.storage_account.name}-table"
-  location                       = var.location
-  resource_group_name            = azurerm_resource_group.rg.name
-  subnet_id                      = module.vnet.subnet_ids[var.pe_subnet_name]
-  tags                           = var.tags
-  private_connection_resource_id = module.storage_account.id
-  is_manual_connection           = false
-  subresource_name               = "table"
-  private_dns_zone_group_name    = "StorageTablePrivateDnsZoneGroup"
-  private_dns_zone_group_ids     = [ module.storage_table_private_dns_zone.id ]
-  depends_on                     = [ module.storage_account ]
-}
-
-#############################
-# Azure OpenAI (Diagnostics Removed)
-#############################
-module "openai" {
-  source                     = "./modules/openai"
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = "eastus"  # OpenAI is supported in eastus.
-  name                       = var.openai_name
-  sku_name                   = var.openai_sku
-  tags                       = var.tags
-  custom_subdomain_name      = var.openai_custom_subdomain_name
-  public_network_access_enabled = false
-  deployments                   = var.openai_deployments
-//  log_analytics_workspace_id    = var.log_analytics_workspace_id  # Dummy value.
-}
-
-module "openai_private_dns_zone" {
-  source                   = "./modules/private_dns_zone"
-  name                     = "privatelink.openai.azure.com"
-  resource_group_name      = azurerm_resource_group.rg.name
-  virtual_networks_to_link = {
-    (var.vnet_name) = {
-      subscription_id     = data.azurerm_client_config.current.subscription_id
-      resource_group_name = azurerm_resource_group.rg.name
-    }
+# Azure Logic Apps
+resource "azurerm_logic_app_workflow" "shield_noor" {
+  name                = "shield-noor-logicapp"
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  location            = azurerm_resource_group.shield_noor.location
+  subnet_id           = azurerm_subnet.other_services.id
+  private_endpoint {
+    subnet_id = azurerm_subnet.other_services.id
   }
-  tags = var.tags
 }
 
-# (Optional) The OpenAI private endpoint module is omitted due to GroupId issues.
+# Azure Functions
+resource "azurerm_function_app" "shield_noor" {
+  name                = "shield-noor-function"
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  location            = azurerm_resource_group.shield_noor.location
+  subnet_id           = azurerm_subnet.other_services.id
+  private_endpoint {
+    subnet_id = azurerm_subnet.other_services.id
+  }
+}
+
+# Azure Storage Account
+resource "azurerm_storage_account" "shield_noor" {
+  name                     = "shieldnoorstorageacc"
+  resource_group_name      = azurerm_resource_group.shield_noor.name
+  location                 = azurerm_resource_group.shield_noor.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  subnet_id                = azurerm_subnet.other_services.id
+  private_endpoint {
+    subnet_id = azurerm_subnet.other_services.id
+  }
+}
