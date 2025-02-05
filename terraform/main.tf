@@ -405,3 +405,117 @@ resource "azurerm_private_endpoint" "containerapps" {
     subresource_names             = ["containerapp"]
   }
 }
+
+
+// add VM:
+
+# Add Management Subnet
+resource "azurerm_subnet" "management" {
+  name                 = "shield-noor-management"
+  resource_group_name  = azurerm_resource_group.shield_noor.name
+  virtual_network_name = azurerm_virtual_network.shield_noor.name
+  address_prefixes     = ["10.0.3.0/24"]
+}
+
+# Create NSG
+resource "azurerm_network_security_group" "management" {
+  name                = "shield-noor-management-nsg"
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
+
+  security_rule {
+    name                       = "Allow-SSH"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Allow-RDP"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3389"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+# Create Public IP
+resource "azurerm_public_ip" "management" {
+  name                = "shield-noor-management-ip"
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
+  allocation_method   = "Static"
+  sku                = "Standard"
+}
+
+# Create NIC
+resource "azurerm_network_interface" "management" {
+  name                = "shield-noor-management-nic"
+  location            = azurerm_resource_group.shield_noor.location
+  resource_group_name = azurerm_resource_group.shield_noor.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.management.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id         = azurerm_public_ip.management.id
+  }
+}
+
+# Associate NSG with NIC
+resource "azurerm_network_interface_security_group_association" "management" {
+  network_interface_id      = azurerm_network_interface.management.id
+  network_security_group_id = azurerm_network_security_group.management.id
+}
+
+# Create Ubuntu Desktop VM
+resource "azurerm_linux_virtual_machine" "management" {
+  name                            = "shield-noor-management-vm"
+  location                        = azurerm_resource_group.shield_noor.location
+  resource_group_name             = azurerm_resource_group.shield_noor.name
+  network_interface_ids           = [azurerm_network_interface.management.id]
+  size                           = "Standard_D2s_v3"
+  admin_username                  = "adminuser"
+  admin_password                  = "P@ssw0rd1234!"  # Change this in production
+  disable_password_authentication = false
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  custom_data = base64encode(<<-EOF
+              #!/bin/bash
+              apt-get update
+              apt-get install -y ubuntu-desktop
+              apt-get install -y xrdp
+              systemctl enable xrdp
+              systemctl start xrdp
+              EOF
+  )
+}
+
+# Output VM public IP
+output "management_vm_public_ip" {
+  value = azurerm_public_ip.management.ip_address
+}
