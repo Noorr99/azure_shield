@@ -45,7 +45,7 @@ resource "azurerm_subnet" "other_services" {
 
 # Azure OpenAI
 resource "azapi_resource" "shield_noor_openai" {
-  type      = "Microsoft.CognitiveServices/accounts"
+  type      = "Microsoft.CognitiveServices/accounts@2021-04-30"
   name      = "shield-noor-openai"
   location  = azurerm_resource_group.shield_noor.location
   parent_id = azurerm_resource_group.shield_noor.id
@@ -86,7 +86,7 @@ resource "azurerm_logic_app_workflow" "shield_noor" {
 }
 
 # Azure Functions
-resource "azurerm_function_app" "shield_noor" {
+resource "azurerm_linux_function_app" "shield_noor" {
   name                = "shield-noor-function"
   resource_group_name = azurerm_resource_group.shield_noor.name
   location            = azurerm_resource_group.shield_noor.location
